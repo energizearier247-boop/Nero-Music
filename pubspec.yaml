@@ -1,7 +1,7 @@
 name: nero_music
 description: Nero Music - Your Music. Your World. Listen, Store, Share and Earn.
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.1.0+2
 
 environment:
   sdk: '>=3.4.0 <4.0.0'
@@ -9,6 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  supabase_flutter: ^2.10.0
+  shared_preferences: ^2.5.3
 
 dev_dependencies:
   flutter_test:
@@ -18,6 +20,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/nero_music_launcher.png
 
 flutter_launcher_icons:
   android: true

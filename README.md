@@ -1,31 +1,30 @@
-# Nero Music
+# Nero Music – Stage 2 foundation
 
-Nero Music is a Flutter Android-first music platform foundation.
+Flutter Android app for Nero Music. Branding: black with the launcher's bright red-to-pink gradient. Android launcher label must be **Nero Music**.
 
-## Confirmed product direction
+## Stage 2 features in this package
 
-- Android first; iPhone later.
-- Black, red and pink identity.
-- Private personal music storage and public music publishing.
-- Anyone may apply for an artist account, subject to verification.
-- Nigeria first, then worldwide.
-- Platform revenue and artist earnings.
+- Supabase Flutter initialization using the project URL and publishable client key.
+- Listener and Artist Applicant email/password registration.
+- Email/password sign-in, password reset email, and Supabase-managed persistent sessions.
+- Dark and light appearance setting saved on the device.
+- Profile menu navigation to Settings and sign out.
+- Navigation destinations and menu rows open their corresponding screen/feature placeholder.
+- Supabase profile table, new-user trigger, and row-level security SQL in `supabase/schema.sql`.
 
-## Current Stage 1 scope
+## Supabase setup
 
-This starter includes the welcome screen, account-type selection, sign-in and registration interface, and five-section app navigation. Authentication forms are currently UI demonstrations only. Supabase authentication, music uploads, streaming, payments, artist verification and earnings are not yet active.
+1. Open the Nero Music Supabase project.
+2. Open **SQL Editor** and run `supabase/schema.sql` from this repository.
+3. In **Authentication → Providers → Email**, keep email confirmation enabled if you want users to verify their email before signing in.
+4. In **Authentication → URL Configuration**, configure the production redirect/deep-link URLs before enabling password recovery links for release builds.
+
+The app uses only the Supabase publishable client key. Never place a Supabase secret/service-role key in the Flutter app or repository.
 
 ## Build
 
-The GitHub Actions workflow `.github/workflows/build-android.yml` generates Android platform files, gets dependencies, formats, analyzes, tests and builds the release APK.
+The separate GitHub Actions workflow is provided in the chat. It creates the Android platform folder, generates the launcher icon, runs formatting, analysis and tests, and builds the release APK. It sets the Android launcher label to `Nero Music`.
 
-Run it from GitHub: Actions -> Build Nero Music Android APK -> Run workflow.
+## Current scope
 
-## Security
-
-Do not put Supabase service-role keys, payment secret keys or other private credentials in Flutter source code. Server-side secrets belong in secure backend configuration.
-
-
-## Android launcher icon
-
-The supplied Nero Music logo is stored at `assets/nero_music_launcher.png`. The Android build workflow generates launcher icon sizes and adaptive icon resources using `flutter_launcher_icons`. No Flutter branding is used for the app icon.
+This is the Stage 2 authentication/theme foundation. Music upload, private storage policies/bucket, streaming playback, payments, artist verification, and production deep links are subsequent implementation milestones. Rows currently navigate to feature landing screens where those features are not yet implemented; navigation is not the same as a completed backend feature.
