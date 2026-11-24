@@ -8,7 +8,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     await Supabase.initialize(
       url: 'https://mavtwrfjkitrgjjxgcca.supabase.co',
-      anonKey: 'sb_publishable_t9RNQkKcc6oNRR6wqrujgg_-xJnXC-M',
+      publishableKey: 'sb_publishable_t9RNQkKcc6oNRR6wqrujgg_-xJnXC-M',
     );
   });
 
