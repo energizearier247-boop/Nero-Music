@@ -1,5 +1,7 @@
 // ignore_for_file: deprecated_member_use
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -17,6 +19,7 @@ const neroRed = Color(0xFFED174C);
 const neroPink = Color(0xFFFF4F91);
 const neroDark = Color(0xFF09090D);
 const neroDarkSurface = Color(0xFF15151D);
+const neroAuthRedirectUrl = 'com.neromusic://login-callback';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,11 +39,30 @@ class NeroMusicApp extends StatefulWidget {
 
 class NeroMusicAppState extends State<NeroMusicApp> {
   ThemeMode _themeMode = ThemeMode.dark;
+  late final StreamSubscription<AuthState> _authSubscription;
+  Session? _session;
+  bool _passwordRecovery = false;
 
   @override
   void initState() {
     super.initState();
+    _session = Supabase.instance.client.auth.currentSession;
+    _authSubscription =
+        Supabase.instance.client.auth.onAuthStateChange.listen((state) {
+      if (!mounted) return;
+      setState(() {
+        _session = state.session;
+        _passwordRecovery =
+            state.event == AuthChangeEvent.passwordRecovery;
+      });
+    });
     _loadTheme();
+  }
+
+  @override
+  void dispose() {
+    _authSubscription.cancel();
+    super.dispose();
   }
 
   Future<void> _loadTheme() async {
@@ -101,9 +123,11 @@ class NeroMusicAppState extends State<NeroMusicApp> {
         theme: _theme(Brightness.light),
         darkTheme: _theme(Brightness.dark),
         themeMode: _themeMode,
-        home: Supabase.instance.client.auth.currentSession == null
-            ? const WelcomeScreen()
-            : const NeroHomeScreen(),
+        home: _passwordRecovery
+            ? const PasswordUpdateScreen()
+            : _session == null
+                ? const WelcomeScreen()
+                : const NeroHomeScreen(),
       );
 }
 
@@ -223,6 +247,7 @@ class _AuthScreenState extends State<AuthScreen> {
         final response = await auth.signUp(
           email: _email.text.trim(),
           password: _password.text,
+          emailRedirectTo: neroAuthRedirectUrl,
           data: {'full_name': _name.text.trim(), 'account_type': widget.accountType},
         );
         if (!mounted) {
@@ -268,7 +293,7 @@ class _AuthScreenState extends State<AuthScreen> {
       return;
     }
     try {
-      await Supabase.instance.client.auth.resetPasswordForEmail(email);
+      await Supabase.instance.client.auth.resetPasswordForEmail(\n        email,\n        redirectTo: neroAuthRedirectUrl,\n      );
       if (mounted) {
         _message('Password reset instructions have been sent if the account exists.');
       }
@@ -321,6 +346,94 @@ class _AuthScreenState extends State<AuthScreen> {
                   textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodySmall),
             ],
           ),
+        ),
+      );
+}
+
+
+class PasswordUpdateScreen extends StatefulWidget {
+  const PasswordUpdateScreen({super.key});
+
+  @override
+  State<PasswordUpdateScreen> createState() => _PasswordUpdateScreenState();
+}
+
+class _PasswordUpdateScreenState extends State<PasswordUpdateScreen> {
+  final _password = TextEditingController();
+  final _confirmPassword = TextEditingController();
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _password.dispose();
+    _confirmPassword.dispose();
+    super.dispose();
+  }
+
+  Future<void> _savePassword() async {
+    final password = _password.text;
+    if (password.length < 8) {
+      _message('Use at least 8 characters for your new password.');
+      return;
+    }
+    if (password != _confirmPassword.text) {
+      _message('The passwords do not match.');
+      return;
+    }
+
+    setState(() => _busy = true);
+    try {
+      await Supabase.instance.client.auth.updateUser(
+        UserAttributes(password: password),
+      );
+      if (!mounted) return;
+      _message('Your password has been updated.');
+    } on AuthException catch (error) {
+      if (mounted) _message(error.message);
+    } catch (_) {
+      if (mounted) {
+        _message('Unable to update your password. Please try again.');
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _message(String value) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(value)),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text('Create a new password')),
+        body: ListView(
+          padding: const EdgeInsets.all(22),
+          children: [
+            const Text(
+              'Choose a new password for your Nero Music account.',
+              style: TextStyle(fontSize: 17),
+            ),
+            const SizedBox(height: 22),
+            TextField(
+              controller: _password,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'New password'),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _confirmPassword,
+              obscureText: true,
+              decoration:
+                  const InputDecoration(labelText: 'Confirm new password'),
+            ),
+            const SizedBox(height: 22),
+            _PrimaryButton(
+              label: _busy ? 'PLEASE WAIT...' : 'UPDATE PASSWORD',
+              onPressed: _busy ? null : _savePassword,
+            ),
+          ],
         ),
       );
 }
