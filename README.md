@@ -17,9 +17,9 @@ Flutter Android app for Nero Music. Branding: black with the launcher's bright r
 1. Open the Nero Music Supabase project.
 2. Open **SQL Editor** and run `supabase/schema.sql` from this repository.
 3. In **Authentication → Providers → Email**, keep email confirmation enabled if you want users to verify their email before signing in.
-4. In **Authentication → URL Configuration**, configure the production redirect/deep-link URLs before enabling password recovery links for release builds.
+4. In **Authentication → URL Configuration → Redirect URLs**, allow `com.neromusic://login-callback`. The app and workflow register this same callback. Keep the Supabase Site URL as your real website URL if you have one; the mobile callback belongs in Additional Redirect URLs.
 
-The app uses only the Supabase publishable client key. Never place a Supabase secret/service-role key in the Flutter app or repository.
+The app uses only the Supabase publishable client key. Never place a Supabase secret/service-role key in the Flutter app or repository. `supabase_flutter` handles incoming auth deep links automatically on Android; the app listens for auth-state changes so the signed-in screen refreshes after a successful callback. Password recovery opens an in-app new-password form.
 
 ## Build
 
