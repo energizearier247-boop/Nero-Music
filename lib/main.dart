@@ -303,7 +303,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   decoration: InputDecoration(labelText: 'Password', prefixIcon: const Icon(Icons.lock_outline),
                     suffixIcon: IconButton(icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off), onPressed: () => setState(() => _obscure = !_obscure))),
                   validator: (v) => v == null || v.length < 8 ? 'Use at least 8 characters' : null),
-              if (!widget.signUp) {
+              if (!widget.signUp)
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
@@ -311,7 +311,6 @@ class _AuthScreenState extends State<AuthScreen> {
                     child: const Text('Forgot password?'),
                   ),
                 ),
-              }
               const SizedBox(height: 18),
               _PrimaryButton(label: _busy ? 'PLEASE WAIT...' : widget.signUp ? 'CREATE ACCOUNT' : 'SIGN IN',
                   onPressed: _busy ? null : _submit),
