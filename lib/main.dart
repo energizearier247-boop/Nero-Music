@@ -28,13 +28,13 @@ class NeroMusicApp extends StatefulWidget {
   const NeroMusicApp({super.key});
 
   @override
-  State<NeroMusicApp> createState() => _NeroMusicAppState();
+  State<NeroMusicApp> createState() => NeroMusicAppState();
 
-  static _NeroMusicAppState of(BuildContext context) =>
-      context.findAncestorStateOfType<_NeroMusicAppState>()!;
+  static NeroMusicAppState of(BuildContext context) =>
+      context.findAncestorStateOfType<NeroMusicAppState>()!;
 }
 
-class _NeroMusicAppState extends State<NeroMusicApp> {
+class NeroMusicAppState extends State<NeroMusicApp> {
   ThemeMode _themeMode = ThemeMode.dark;
 
   @override
@@ -45,7 +45,9 @@ class _NeroMusicAppState extends State<NeroMusicApp> {
 
   Future<void> _loadTheme() async {
     final prefs = await SharedPreferences.getInstance();
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     setState(() => _themeMode = prefs.getBool('nero_dark_mode') == false
         ? ThemeMode.light
         : ThemeMode.dark);
@@ -223,7 +225,9 @@ class _AuthScreenState extends State<AuthScreen> {
           password: _password.text,
           data: {'full_name': _name.text.trim(), 'account_type': widget.accountType},
         );
-        if (!mounted) return;
+        if (!mounted) {
+      return;
+    }
         final verifiedImmediately = response.session != null;
         _message(verifiedImmediately
             ? 'Your account has been created.'
@@ -234,16 +238,24 @@ class _AuthScreenState extends State<AuthScreen> {
         }
       } else {
         await auth.signInWithPassword(email: _email.text.trim(), password: _password.text);
-        if (!mounted) return;
+        if (!mounted) {
+      return;
+    }
         Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute<void>(builder: (_) => const NeroHomeScreen()), (_) => false);
       }
     } on AuthException catch (error) {
-      if (mounted) _message(error.message);
+      if (mounted) {
+        _message(error.message);
+      }
     } catch (_) {
-      if (mounted) _message('Unable to connect. Check your internet connection and try again.');
+      if (mounted) {
+        _message('Unable to connect. Check your internet connection and try again.');
+      }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() => _busy = false);
+      }
     }
   }
 
@@ -257,9 +269,13 @@ class _AuthScreenState extends State<AuthScreen> {
     }
     try {
       await Supabase.instance.client.auth.resetPasswordForEmail(email);
-      if (mounted) _message('Password reset instructions have been sent if the account exists.');
+      if (mounted) {
+        _message('Password reset instructions have been sent if the account exists.');
+      }
     } on AuthException catch (error) {
-      if (mounted) _message(error.message);
+      if (mounted) {
+        _message(error.message);
+      }
     }
   }
 
@@ -287,8 +303,15 @@ class _AuthScreenState extends State<AuthScreen> {
                   decoration: InputDecoration(labelText: 'Password', prefixIcon: const Icon(Icons.lock_outline),
                     suffixIcon: IconButton(icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off), onPressed: () => setState(() => _obscure = !_obscure))),
                   validator: (v) => v == null || v.length < 8 ? 'Use at least 8 characters' : null),
-              if (!widget.signUp) Align(alignment: Alignment.centerRight,
-                child: TextButton(onPressed: _forgotPassword, child: const Text('Forgot password?'))),
+              if (!widget.signUp) {
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: _forgotPassword,
+                    child: const Text('Forgot password?'),
+                  ),
+                ),
+              }
               const SizedBox(height: 18),
               _PrimaryButton(label: _busy ? 'PLEASE WAIT...' : widget.signUp ? 'CREATE ACCOUNT' : 'SIGN IN',
                   onPressed: _busy ? null : _submit),
@@ -437,7 +460,12 @@ class SettingsScreen extends StatelessWidget {
       const Divider(),
       ListTile(leading: const Icon(Icons.logout, color: neroPink), title: const Text('Sign out'), onTap: () async {
         await Supabase.instance.client.auth.signOut();
-        if (context.mounted) Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute<void>(builder: (_) => const WelcomeScreen()), (_) => false);
+        if (context.mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute<void>(builder: (_) => const WelcomeScreen()),
+            (_) => false,
+          );
+        }
       }),
     ]));
   }
