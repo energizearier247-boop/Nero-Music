@@ -1051,7 +1051,11 @@ class LibraryStore {
   static Future<Map<String, List<Map<String, dynamic>>>> load() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_key);
-    if (raw == null) return {for (final section in sections) section: <Map<String, dynamic>>[]};
+    if (raw == null) {
+      return {
+        for (final section in sections) section: <Map<String, dynamic>>[],
+      };
+    }
     try {
       final decoded = jsonDecode(raw) as Map<String, dynamic>;
       return {
