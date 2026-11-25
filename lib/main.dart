@@ -42,21 +42,54 @@ class NeroMusicAppState extends State<NeroMusicApp> {
   late final StreamSubscription<AuthState> _authSubscription;
   Session? _session;
   bool _passwordRecovery = false;
+  bool _showSignInAfterVerification = false;
 
   @override
   void initState() {
     super.initState();
     _session = Supabase.instance.client.auth.currentSession;
-    _authSubscription =
-        Supabase.instance.client.auth.onAuthStateChange.listen((state) {
+    _authSubscription = Supabase.instance.client.auth.onAuthStateChange
+        .listen(_handleAuthState);
+    _restorePendingVerification();
+    _loadTheme();
+  }
+
+  Future<void> _restorePendingVerification() async {
+    final prefs = await SharedPreferences.getInstance();
+    final pending = prefs.getBool('nero_pending_email_verification') ?? false;
+    if (!pending || Supabase.instance.client.auth.currentSession == null) {
+      return;
+    }
+    await prefs.remove('nero_pending_email_verification');
+    await Supabase.instance.client.auth.signOut();
+    if (!mounted) return;
+    setState(() {
+      _session = null;
+      _showSignInAfterVerification = true;
+    });
+  }
+
+  Future<void> _handleAuthState(AuthState state) async {
+    final prefs = await SharedPreferences.getInstance();
+    final pending = prefs.getBool('nero_pending_email_verification') ?? false;
+
+    if (state.event == AuthChangeEvent.signedIn && pending) {
+      await prefs.remove('nero_pending_email_verification');
+      await Supabase.instance.client.auth.signOut();
       if (!mounted) return;
       setState(() {
-        _session = state.session;
-        _passwordRecovery =
-            state.event == AuthChangeEvent.passwordRecovery;
+        _session = null;
+        _passwordRecovery = false;
+        _showSignInAfterVerification = true;
       });
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _session = state.session;
+      _passwordRecovery = state.event == AuthChangeEvent.passwordRecovery;
     });
-    _loadTheme();
   }
 
   @override
@@ -125,9 +158,11 @@ class NeroMusicAppState extends State<NeroMusicApp> {
         themeMode: _themeMode,
         home: _passwordRecovery
             ? const PasswordUpdateScreen()
-            : _session == null
-                ? const WelcomeScreen()
-                : const NeroHomeScreen(),
+            : _showSignInAfterVerification
+                ? const AuthScreen(signUp: false, accountType: 'Listener')
+                : _session == null
+                    ? const WelcomeScreen()
+                    : const NeroHomeScreen(),
       );
 }
 
@@ -244,6 +279,7 @@ class _AuthScreenState extends State<AuthScreen> {
     try {
       final auth = Supabase.instance.client.auth;
       if (widget.signUp) {
+        final prefs = await SharedPreferences.getInstance();
         final response = await auth.signUp(
           email: _email.text.trim(),
           password: _password.text,
@@ -254,6 +290,11 @@ class _AuthScreenState extends State<AuthScreen> {
       return;
     }
         final verifiedImmediately = response.session != null;
+        if (verifiedImmediately) {
+          await prefs.remove('nero_pending_email_verification');
+        } else {
+          await prefs.setBool('nero_pending_email_verification', true);
+        }
         _message(verifiedImmediately
             ? 'Your account has been created.'
             : 'Registration submitted. Check your email to verify your account before signing in.');
@@ -270,6 +311,10 @@ class _AuthScreenState extends State<AuthScreen> {
             MaterialPageRoute<void>(builder: (_) => const NeroHomeScreen()), (_) => false);
       }
     } on AuthException catch (error) {
+      if (widget.signUp) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('nero_pending_email_verification');
+      }
       if (mounted) {
         _message(error.message);
       }
@@ -458,7 +503,7 @@ class _NeroHomeScreenState extends State<NeroHomeScreen> {
       _ListTab(title: 'Explore', subtitle: 'Find music, artists, albums and playlists.', items: const ['Trending music', 'New releases', 'Top artists', 'Afrobeats', 'Gospel', 'Hip-Hop', 'R&B']),
       _ListTab(title: 'My Library', subtitle: 'Your private music and saved collection.', items: const ['Private music vault', 'My uploads', 'Playlists', 'Favourites', 'Purchased music', 'Downloads']),
       _ListTab(title: 'Earnings', subtitle: 'Artist earnings and transaction history.', items: const ['Available balance', 'Pending earnings', 'Streaming royalties', 'Music sales', 'Withdrawal requests']),
-      _ListTab(title: 'My Profile', subtitle: 'Manage your Nero Music account.', items: const ['Personal information', 'Artist application', 'Premium membership', 'Payment methods', 'Settings', 'Help and support']),
+      const _ProfileTab(),
     ];
     return Scaffold(
       appBar: _index == 0 ? null : AppBar(title: Text(_titles[_index])),
@@ -494,8 +539,61 @@ class _HomeTab extends StatelessWidget {
           const SizedBox(height: 18),
           TextField(readOnly: true, onTap: () => _open(context, 'Search music'), decoration: const InputDecoration(hintText: 'Search songs, albums and artists', prefixIcon: Icon(Icons.search, color: neroPink))),
           const SizedBox(height: 22),
-          Container(padding: const EdgeInsets.all(22), decoration: BoxDecoration(borderRadius: BorderRadius.circular(22), gradient: const LinearGradient(colors: [Color(0xFFED174C), Color(0xFFFF4F91)])),
-            child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('FEEL THE MUSIC', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white)), SizedBox(height: 8), Text('Discover new sounds. Support the artists you love.', style: TextStyle(color: Colors.white)), SizedBox(height: 12), Icon(Icons.graphic_eq, size: 42, color: Colors.white)])),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(22),
+            child: SizedBox(
+              height: 205,
+              width: double.infinity,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.asset(
+                    'assets/nero_music_banner.webp',
+                    fit: BoxFit.cover,
+                    alignment: Alignment.topCenter,
+                  ),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomLeft,
+                        end: Alignment.topRight,
+                        colors: [
+                          neroDark.withValues(alpha: 0.88),
+                          neroDark.withValues(alpha: 0.12),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Align(
+                      alignment: Alignment.bottomLeft,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'FEEL THE MUSIC',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                          SizedBox(height: 6),
+                          Text(
+                            'Discover new sounds. Support the artists you love.',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           const SizedBox(height: 24),
           const Text('Made for you', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
@@ -539,6 +637,88 @@ class _ListTab extends StatelessWidget {
     const SizedBox(height: 22),
     for (final item in items) _MenuTile(icon: title == 'Explore' ? Icons.explore : title == 'My Library' ? Icons.library_music : title == 'Earnings' ? Icons.account_balance_wallet : Icons.person, title: item, onTap: () { if (item == 'Settings') { Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const SettingsScreen())); } else { _open(context, item); } }),
   ]);
+}
+
+
+class _ProfileTab extends StatelessWidget {
+  const _ProfileTab();
+
+  @override
+  Widget build(BuildContext context) => ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(22),
+            child: Stack(
+              alignment: Alignment.bottomLeft,
+              children: [
+                SizedBox(
+                  height: 230,
+                  width: double.infinity,
+                  child: Image.asset(
+                    'assets/nero_profile_photo.jpg',
+                    fit: BoxFit.cover,
+                    alignment: Alignment.topCenter,
+                  ),
+                ),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        neroDark.withValues(alpha: 0.88),
+                      ],
+                    ),
+                  ),
+                  child: const Text(
+                    'YOUR NERO MUSIC SPACE',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 22),
+          const Text(
+            'My Profile',
+            style: TextStyle(fontSize: 27, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 18),
+          for (final item in const [
+            'Personal information',
+            'Artist application',
+            'Premium membership',
+            'Payment methods',
+            'Settings',
+            'Help and support',
+          ])
+            _MenuTile(
+              icon: item == 'Settings' ? Icons.settings : Icons.person,
+              title: item,
+              onTap: () {
+                if (item == 'Settings') {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => const SettingsScreen(),
+                    ),
+                  );
+                } else {
+                  _open(context, item);
+                }
+              },
+            ),
+        ],
+      );
 }
 
 class _MenuTile extends StatelessWidget {
