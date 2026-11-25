@@ -27,14 +27,14 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Flutter
+      - name: Set up Flutter stable
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
 
-      # Generate Android files only if they do not already exist.
       - name: Generate Android platform if missing
+        shell: bash
         run: |
           if [ ! -d android ]; then
             flutter create \
@@ -45,78 +45,152 @@ jobs:
             echo "Existing Android project preserved."
           fi
 
-      # Ensure the installed Android app can access the internet.
-      - name: Configure Android network permissions
+      - name: Configure Android permissions and Nero deep link
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import xml.etree.ElementTree as ET
 
-          manifest = Path(
-              "android/app/src/main/AndroidManifest.xml"
-          )
-
-          if not manifest.exists():
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          if not manifest.is_file():
               raise SystemExit("AndroidManifest.xml was not found.")
 
-          content = manifest.read_text()
+          android = "http://schemas.android.com/apk/res/android"
+          ET.register_namespace("android", android)
+          tree = ET.parse(manifest)
+          root = tree.getroot()
 
-          permissions = [
+          required_permissions = (
               "android.permission.INTERNET",
               "android.permission.ACCESS_NETWORK_STATE",
-          ]
+          )
 
-          for permission in permissions:
-              declaration = (
-                  f'<uses-permission android:name="{permission}"/>'
-              )
+          existing_permissions = {
+              node.get(f"{{{android}}}name")
+              for node in root.findall("uses-permission")
+          }
 
-              if permission not in content:
-                  content = content.replace(
-                      "<application",
-                      f"    {declaration}\n    <application",
-                      1
+          for permission in required_permissions:
+              if permission not in existing_permissions:
+                  ET.SubElement(
+                      root,
+                      "uses-permission",
+                      {f"{{{android}}}name": permission},
                   )
 
-          if "<application" not in content:
-              raise SystemExit(
-                  "Could not find application element in manifest."
+          application = root.find("application")
+          if application is None:
+              raise SystemExit("Manifest has no application element.")
+
+          application.set(
+              f"{{{android}}}label", "Nero Music"
+          )
+
+          launcher_activity = None
+
+          for activity in application.findall("activity"):
+              for intent_filter in activity.findall("intent-filter"):
+                  actions = {
+                      item.get(f"{{{android}}}name")
+                      for item in intent_filter.findall("action")
+                  }
+                  categories = {
+                      item.get(f"{{{android}}}name")
+                      for item in intent_filter.findall("category")
+                  }
+
+                  if (
+                      "android.intent.action.MAIN" in actions
+                      and "android.intent.category.LAUNCHER" in categories
+                  ):
+                      launcher_activity = activity
+                      break
+
+              if launcher_activity is not None:
+                  break
+
+          if launcher_activity is None:
+              raise SystemExit("Launcher activity not found.")
+
+          already_configured = False
+
+          for intent_filter in launcher_activity.findall("intent-filter"):
+              for data in intent_filter.findall("data"):
+                  if (
+                      data.get(f"{{{android}}}scheme") == "com.neromusic"
+                      and data.get(f"{{{android}}}host") == "login-callback"
+                  ):
+                      already_configured = True
+
+          if not already_configured:
+              intent_filter = ET.SubElement(
+                  launcher_activity, "intent-filter"
               )
 
-          manifest.write_text(content)
+              ET.SubElement(
+                  intent_filter,
+                  "action",
+                  {f"{{{android}}}name": "android.intent.action.VIEW"},
+              )
 
-          print("Android network permissions configured.")
+              ET.SubElement(
+                  intent_filter,
+                  "category",
+                  {f"{{{android}}}name": "android.intent.category.DEFAULT"},
+              )
+
+              ET.SubElement(
+                  intent_filter,
+                  "category",
+                  {f"{{{android}}}name": "android.intent.category.BROWSABLE"},
+              )
+
+              ET.SubElement(
+                  intent_filter,
+                  "data",
+                  {
+                      f"{{{android}}}scheme": "com.neromusic",
+                      f"{{{android}}}host": "login-callback",
+                  },
+              )
+
+          tree.write(
+              manifest,
+              encoding="utf-8",
+              xml_declaration=True,
+          )
+
+          print("Android permissions and deep link configured.")
           PY
 
-      - name: Set exact launcher name
-        run: |
-          sed -i 's/android:label="[^"]*"/android:label="Nero Music"/' \
-            android/app/src/main/AndroidManifest.xml
-
-      - name: Install dependencies
+      - name: Install Flutter dependencies
         run: flutter pub get
 
-      - name: Generate launcher icons
+      - name: Generate Nero Music launcher icons
         run: dart run flutter_launcher_icons
 
-      - name: Format Dart files
+      - name: Format Dart source and tests
         run: dart format lib test
 
-      - name: Analyze project
+      - name: Analyze Flutter project
         run: flutter analyze
 
-      - name: Run tests
+      - name: Run Flutter tests
         run: flutter test
 
       - name: Build release APK
         run: flutter build apk --release
 
-      - name: Verify APK
+      - name: Verify release APK
+        shell: bash
         run: |
-          test -s build/app/outputs/flutter-apk/app-release.apk
-          echo "Nero Music APK successfully generated."
+          APK="build/app/outputs/flutter-apk/app-release.apk"
+          test -s "$APK"
+          echo "Verified APK: $APK"
+          ls -lh "$APK"
 
-      - name: Upload APK
+      - name: Upload release APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: nero-music-release-apk
