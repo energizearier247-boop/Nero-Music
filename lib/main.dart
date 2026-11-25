@@ -337,18 +337,29 @@ class _AuthScreenState extends State<AuthScreen> {
       _message('Enter your email address first.');
       return;
     }
+
+    // Capture the messenger before awaiting so BuildContext is not
+    // accessed across an asynchronous gap.
+    final messenger = ScaffoldMessenger.of(context);
+
     try {
       await Supabase.instance.client.auth.resetPasswordForEmail(
         email,
         redirectTo: neroAuthRedirectUrl,
       );
-      if (mounted) {
-        _message('Password reset instructions have been sent if the account exists.');
-      }
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Password reset instructions have been sent if the account exists.',
+          ),
+        ),
+      );
     } on AuthException catch (error) {
-      if (mounted) {
-        _message(error.message);
-      }
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
     }
   }
 
