@@ -1,0 +1,18 @@
+NERO MUSIC — ASYNC BUILD CONTEXT CORRECTION
+
+The authentication submit flow previously used Navigator.of(context) after asynchronous
+operations. The sign-up branch performs additional SharedPreferences awaits after the
+Supabase sign-up call, so an earlier mounted check did not protect the later context use.
+
+Correction:
+- Added neroNavigatorKey (GlobalKey<NavigatorState>).
+- Registered it on the root MaterialApp using navigatorKey.
+- Replaced both post-await Navigator.of(context) calls in AuthScreen._submit with
+  neroNavigatorKey.currentState?.pushAndRemoveUntil(...).
+- Kept mounted checks around State operations and the existing global ScaffoldMessenger
+  approach for password-reset notifications.
+
+This removes BuildContext usage from the asynchronous AuthScreen._submit navigation path.
+The Flutter/Dart SDK is not installed in this execution environment, so flutter analyze,
+flutter test, and APK build could not be executed here. Run the repository GitHub Actions
+workflow to obtain the authoritative analyzer result.
