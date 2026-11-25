@@ -25,6 +25,8 @@ flutter:
     - assets/nero_music_launcher.png
     - assets/nero_music_banner.webp
     - assets/nero_profile_photo.jpg
+    - assets/afrobeats_stage.jpg
+    - assets/late_night_studio.jpg
 
 flutter_launcher_icons:
   android: true
