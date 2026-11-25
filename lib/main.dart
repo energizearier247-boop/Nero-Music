@@ -537,4 +537,284 @@ class _NeroHomeScreenState extends State<NeroHomeScreen> {
         destinations: const [
           NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
           NavigationDestination(icon: Icon(Icons.explore_outlined), selectedIcon: Icon(Icons.explore), label: 'Explore'),
-          NavigationDestination(icon: Icon(Icons.library_music_outli
+          NavigationDestination(icon: Icon(Icons.library_music_outlined), selectedIcon: Icon(Icons.library_music), label: 'Library'),
+          NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet), label: 'Earnings'),
+          NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Profile'),
+        ],
+      ),
+    );
+  }
+}
+
+class _HomeTab extends StatelessWidget {
+  const _HomeTab();
+  @override
+  Widget build(BuildContext context) => ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Row(children: [
+            const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('NERO MUSIC', style: TextStyle(color: neroPink, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+              SizedBox(height: 6), Text('Your sound starts here.', style: TextStyle(fontSize: 23, fontWeight: FontWeight.bold)),
+            ])),
+            IconButton(onPressed: () => _open(context, 'Notifications'), icon: const Icon(Icons.notifications_none)),
+          ]),
+          const SizedBox(height: 18),
+          TextField(readOnly: true, onTap: () => _open(context, 'Search music'), decoration: const InputDecoration(hintText: 'Search songs, albums and artists', prefixIcon: Icon(Icons.search, color: neroPink))),
+          const SizedBox(height: 22),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(22),
+            child: SizedBox(
+              height: 205,
+              width: double.infinity,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.asset(
+                    'assets/nero_music_banner.webp',
+                    fit: BoxFit.cover,
+                    alignment: Alignment.topCenter,
+                  ),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomLeft,
+                        end: Alignment.topRight,
+                        colors: [
+                          neroDark.withValues(alpha: 0.88),
+                          neroDark.withValues(alpha: 0.12),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Align(
+                      alignment: Alignment.bottomLeft,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'FEEL THE MUSIC',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                          SizedBox(height: 6),
+                          Text(
+                            'Discover new sounds. Support the artists you love.',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Text('Made for you', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _MusicCard(
+                  title: 'Afrobeats Mix',
+                  subtitle: 'Fresh African sounds',
+                  icon: Icons.album,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _MusicCard(
+                  title: 'Late Night',
+                  subtitle: 'R&B and chill',
+                  icon: Icons.nightlight_round,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          const Text('Explore genres', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
+          Wrap(spacing: 8, children: ['Afrobeats', 'Gospel', 'Hip-Hop', 'R&B', 'Pop', 'Highlife'].map((g) => ActionChip(label: Text(g), onPressed: () => _open(context, g))).toList()),
+          const SizedBox(height: 20),
+          _MenuTile(icon: Icons.mic, title: 'Artist opportunities', subtitle: 'Apply to publish music and earn', onTap: () => _open(context, 'Artist application')),
+        ],
+      );
+}
+
+class _ListTab extends StatelessWidget {
+  const _ListTab({required this.title, required this.subtitle, required this.items});
+  final String title;
+  final String subtitle;
+  final List<String> items;
+  @override
+  Widget build(BuildContext context) => ListView(padding: const EdgeInsets.all(20), children: [
+    Text(title, style: const TextStyle(fontSize: 27, fontWeight: FontWeight.bold)),
+    const SizedBox(height: 7), Text(subtitle, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+    const SizedBox(height: 22),
+    for (final item in items) _MenuTile(icon: title == 'Explore' ? Icons.explore : title == 'My Library' ? Icons.library_music : title == 'Earnings' ? Icons.account_balance_wallet : Icons.person, title: item, onTap: () { if (item == 'Settings') { Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const SettingsScreen())); } else { _open(context, item); } }),
+  ]);
+}
+
+
+class _ProfileTab extends StatelessWidget {
+  const _ProfileTab();
+
+  @override
+  Widget build(BuildContext context) => ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(22),
+            child: Stack(
+              alignment: Alignment.bottomLeft,
+              children: [
+                SizedBox(
+                  height: 230,
+                  width: double.infinity,
+                  child: Image.asset(
+                    'assets/nero_profile_photo.jpg',
+                    fit: BoxFit.cover,
+                    alignment: Alignment.topCenter,
+                  ),
+                ),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        neroDark.withValues(alpha: 0.88),
+                      ],
+                    ),
+                  ),
+                  child: const Text(
+                    'YOUR NERO MUSIC SPACE',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 22),
+          const Text(
+            'My Profile',
+            style: TextStyle(fontSize: 27, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 18),
+          for (final item in const [
+            'Personal information',
+            'Artist application',
+            'Premium membership',
+            'Payment methods',
+            'Settings',
+            'Help and support',
+          ])
+            _MenuTile(
+              icon: item == 'Settings' ? Icons.settings : Icons.person,
+              title: item,
+              onTap: () {
+                if (item == 'Settings') {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => const SettingsScreen(),
+                    ),
+                  );
+                } else {
+                  _open(context, item);
+                }
+              },
+            ),
+        ],
+      );
+}
+
+class _MenuTile extends StatelessWidget {
+  const _MenuTile({required this.icon, required this.title, this.subtitle, required this.onTap});
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => Card(margin: const EdgeInsets.only(bottom: 12), child: ListTile(
+    contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
+    leading: Icon(icon, color: neroPink), title: Text(title), subtitle: subtitle == null ? null : Text(subtitle!),
+    trailing: const Icon(Icons.chevron_right), onTap: onTap,
+  ));
+}
+
+class _MusicCard extends StatelessWidget {
+  const _MusicCard({required this.title, required this.subtitle, required this.icon});
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  @override
+  Widget build(BuildContext context) => InkWell(onTap: () => _open(context, title), child: Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Container(height: 85, decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), gradient: const LinearGradient(colors: [neroRed, neroPink])), child: Icon(icon, color: Colors.white, size: 40)),
+    const SizedBox(height: 10), Text(title, style: const TextStyle(fontWeight: FontWeight.bold)), Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+  ]))));
+}
+
+void _open(BuildContext context, String title) {
+  Navigator.push(context, MaterialPageRoute<void>(builder: (_) => DetailScreen(title: title)));
+}
+
+class DetailScreen extends StatelessWidget {
+  const DetailScreen({super.key, required this.title});
+  final String title;
+  @override
+  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text(title)), body: Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
+    const Icon(Icons.graphic_eq, color: neroPink, size: 52), const SizedBox(height: 14), Text(title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+    const SizedBox(height: 8), const Text('This section will be activated as its Stage 2 feature is connected.'),
+  ]))));
+}
+
+class SettingsScreen extends StatelessWidget {
+  const SettingsScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final app = NeroMusicApp.of(context);
+    return Scaffold(appBar: AppBar(title: const Text('Settings')), body: ListView(padding: const EdgeInsets.all(20), children: [
+      const Text('Appearance', style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold)),
+      const SizedBox(height: 12),
+      SwitchListTile(value: Theme.of(context).brightness == Brightness.dark, activeThumbColor: neroPink, title: const Text('Dark mode'), subtitle: const Text('Turn dark appearance on or off'), onChanged: app.setDarkMode),
+      const Divider(),
+      ListTile(leading: const Icon(Icons.logout, color: neroPink), title: const Text('Sign out'), onTap: () async {
+        await Supabase.instance.client.auth.signOut();
+        if (context.mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute<void>(builder: (_) => const WelcomeScreen()),
+            (_) => false,
+          );
+        }
+      }),
+    ]));
+  }
+}
+
+class _PrimaryButton extends StatelessWidget {
+  const _PrimaryButton({required this.label, required this.onPressed});
+  final String label;
+  final VoidCallback? onPressed;
+  @override
+  Widget build(BuildContext context) => SizedBox(height: 54, child: FilledButton(
+    onPressed: onPressed,
+    style: FilledButton.styleFrom(backgroundColor: neroRed, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+    child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+  ));
+}
