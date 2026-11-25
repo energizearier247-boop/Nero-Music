@@ -1,0 +1,16 @@
+NERO MUSIC - IMPLEMENTATION UPDATE
+
+This update connects the Home banner controls to a featured-track preview playlist fetched from the iTunes Search API.
+
+Implemented in this update:
+- Home banner loads featured Afrobeats track previews.
+- Play/Pause starts and pauses the selected preview.
+- Previous and Next change the featured track and start its preview.
+- Featured track title and artist are displayed on the banner.
+- Player stream subscription is cancelled and the player is disposed with the Home screen.
+
+Important current limitations:
+- iTunes results are previews, not full-length commercial streaming tracks.
+- This update does not yet implement licensed full-track playback, actual audio-file uploads, offline audio downloads, artist payouts, or a production earnings ledger.
+- Uploading music for all users requires a configured storage bucket, database schema, security policies, content reporting/moderation, and confirmation that uploaders have distribution rights.
+- Flutter/Dart SDK was not available in the editing environment, so run the repository GitHub Actions workflow to perform format, analyze, test, and APK build validation.
