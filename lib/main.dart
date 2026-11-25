@@ -86,7 +86,9 @@ class NeroMusicAppState extends State<NeroMusicApp> {
       }
     }
 
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     setState(() {
       _session = state.session;
       _passwordRecovery = state.event == AuthChangeEvent.passwordRecovery;
@@ -94,7 +96,9 @@ class NeroMusicAppState extends State<NeroMusicApp> {
   }
 
   Future<void> _redirectToSignInAfterVerification() async {
-    if (_verificationRedirectInProgress) return;
+    if (_verificationRedirectInProgress) {
+      return;
+    }
     _verificationRedirectInProgress = true;
 
     try {
@@ -102,7 +106,9 @@ class NeroMusicAppState extends State<NeroMusicApp> {
       await prefs.remove('nero_pending_email_verification');
       await Supabase.instance.client.auth.signOut();
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _session = null;
         _passwordRecovery = false;
@@ -309,7 +315,9 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
     setState(() => _busy = true);
     try {
       final auth = Supabase.instance.client.auth;
@@ -330,7 +338,9 @@ class _AuthScreenState extends State<AuthScreen> {
         } else {
           await prefs.setBool('nero_pending_email_verification', true);
         }
-        if (!mounted) return;
+        if (!mounted) {
+          return;
+        }
         _message(verifiedImmediately
             ? 'Your account has been created.'
             : 'Registration submitted. Check your email to verify your account before signing in.');
@@ -383,7 +393,9 @@ class _AuthScreenState extends State<AuthScreen> {
         email,
         redirectTo: neroAuthRedirectUrl,
       );
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       neroScaffoldMessengerKey.currentState?.showSnackBar(
         const SnackBar(
           content: Text(
@@ -392,12 +404,16 @@ class _AuthScreenState extends State<AuthScreen> {
         ),
       );
     } on AuthException catch (error) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       neroScaffoldMessengerKey.currentState?.showSnackBar(
         SnackBar(content: Text(error.message)),
       );
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       neroScaffoldMessengerKey.currentState?.showSnackBar(
         const SnackBar(
           content: Text('Unable to send reset instructions. Please try again.'),
@@ -488,16 +504,22 @@ class _PasswordUpdateScreenState extends State<PasswordUpdateScreen> {
       await Supabase.instance.client.auth.updateUser(
         UserAttributes(password: password),
       );
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       _message('Your password has been updated.');
     } on AuthException catch (error) {
-      if (mounted) _message(error.message);
+      if (mounted) {
+        _message(error.message);
+      }
     } catch (_) {
       if (mounted) {
         _message('Unable to update your password. Please try again.');
       }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) setState(() {
+        => _busy = false);
+      }
     }
   }
 
@@ -742,7 +764,9 @@ class _SearchScreenState extends State<SearchScreen> {
     super.initState();
     _query.text = widget.initialQuery;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) unawaited(_search(widget.initialQuery));
+      if (mounted) {
+        unawaited(_search(widget.initialQuery));
+      }
     });
   }
 
@@ -801,14 +825,18 @@ class _SearchScreenState extends State<SearchScreen> {
         _itunesSearch(term, 'song'),
         _itunesSearch(term, 'musicArtist'),
       ]);
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _songs = results[0].where((song) => song['previewUrl'] != null).toList();
         _artists = results[1];
         _loading = false;
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _loading = false;
         _error = 'Could not search music right now. Check your internet connection and try again.';
@@ -818,18 +846,26 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _playSong(Map<String, dynamic> song) async {
     final url = song['previewUrl'] as String?;
-    if (url == null || url.isEmpty) return;
+    if (url == null || url.isEmpty) {
+      return;
+    }
     try {
       if (_playingUrl == url && _player.playing) {
         await _player.pause();
-        if (mounted) setState(() {});
+        if (mounted) setState(() {
+          {});
+        }
         return;
       }
       await _player.setUrl(url);
-      if (mounted) setState(() => _playingUrl = url);
+      if (mounted) setState(() {
+        => _playingUrl = url);
+      }
       unawaited(_player.play());
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('This preview could not be played. Please try another track.')),
       );
@@ -920,7 +956,9 @@ class _SearchScreenState extends State<SearchScreen> {
                 onSelected: (action) async {
                   if (action == 'play') { await _playSong(song); return; }
                   final result = await LibraryStore.add(action, song);
-                  if (!context.mounted) return;
+                  if (!context.mounted) {
+                    return;
+                  }
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result)));
                 },
                 itemBuilder: (_) => const [
@@ -1053,10 +1091,14 @@ class LibraryStore {
 
   static Future<String> addPlaylist(String name) async {
     final clean = name.trim();
-    if (clean.isEmpty) return 'Enter a playlist name.';
+    if (clean.isEmpty) {
+      return 'Enter a playlist name.';
+    }
     final data = await load();
     final playlists = data['Playlists']!;
-    if (playlists.any((item) => item['trackName'] == clean)) return 'That playlist already exists.';
+    if (playlists.any((item) => item['trackName'] == clean)) {
+      return 'That playlist already exists.';
+    }
     playlists.add({'trackName': clean, 'artistName': 'Playlist', 'savedAt': DateTime.now().toIso8601String(), 'isPlaylist': true});
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_key, jsonEncode(data));
@@ -1085,9 +1127,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
       actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')), ElevatedButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('Create'))],
     ));
     controller.dispose();
-    if (name == null) return;
+    if (name == null) {
+      return;
+    }
     final message = await LibraryStore.addPlaylist(name);
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     _refresh();
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
@@ -1103,9 +1149,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
       ]),
       actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')), ElevatedButton(onPressed: () => Navigator.pop(context, [title.text, artist.text]), child: const Text('Save'))],
     ));
-    if (values == null || values.first.trim().isEmpty) return;
+    if (values == null || values.first.trim().isEmpty) {
+      return;
+    }
     final result = await LibraryStore.add('My Uploads', {'trackName': values.first.trim(), 'artistName': values[1].trim().isEmpty ? 'Unknown artist' : values[1].trim(), 'savedAt': DateTime.now().toIso8601String()});
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     _refresh();
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result)));
   }
