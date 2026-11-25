@@ -818,7 +818,20 @@ class _HomeTabState extends State<_HomeTab> {
           ]),
           const SizedBox(height: 22),
           const Text('Explore genres', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
-          Wrap(spacing: 8, children: ['Afrobeats', 'Gospel', 'Hip-Hop', 'R&B', 'Pop', 'Highlife'].map((g) => ActionChip(label: Text(g), onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => SearchScreen(initialQuery: g)))).toList()),
+          Wrap(
+            spacing: 8,
+            children: ['Afrobeats', 'Gospel', 'Hip-Hop', 'R&B', 'Pop', 'Highlife']
+                .map((g) => ActionChip(
+                      label: Text(g),
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) => SearchScreen(initialQuery: g),
+                        ),
+                      ),
+                    ))
+                .toList(),
+          ),
           const SizedBox(height: 20),
           _MenuTile(icon: Icons.mic, title: 'Artist opportunities', subtitle: 'Apply to publish music and earn', onTap: () => _open(context, 'Artist application')),
         ],
