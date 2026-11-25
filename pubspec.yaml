@@ -22,6 +22,8 @@ flutter:
   uses-material-design: true
   assets:
     - assets/nero_music_launcher.png
+    - assets/nero_music_banner.webp
+    - assets/nero_profile_photo.jpg
 
 flutter_launcher_icons:
   android: true

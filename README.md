@@ -8,6 +8,8 @@ Flutter Android app for Nero Music. Branding: black with the launcher's bright r
 - Listener and Artist Applicant email/password registration.
 - Email/password sign-in, password reset email, and Supabase-managed persistent sessions.
 - Dark and light appearance setting saved on the device.
+- Post-email-verification routing to the sign-in screen when a pending registration is confirmed.
+- User-provided banner image on Home and portrait image in Profile.
 - Profile menu navigation to Settings and sign out.
 - Navigation destinations and menu rows open their corresponding screen/feature placeholder.
 - Supabase profile table, new-user trigger, and row-level security SQL in `supabase/schema.sql`.
@@ -27,4 +29,4 @@ The separate GitHub Actions workflow is provided in the chat. It creates the And
 
 ## Current scope
 
-This is the Stage 2 authentication/theme foundation. Music upload, private storage policies/bucket, streaming playback, payments, artist verification, and production deep links are subsequent implementation milestones. Rows currently navigate to feature landing screens where those features are not yet implemented; navigation is not the same as a completed backend feature.
+This is the Stage 2 authentication/theme foundation. Music upload, private storage policies/bucket, streaming playback, live music search, dynamic artist artwork, payments, artist verification, and production deep links are subsequent implementation milestones. The supplied Profile portrait is a static design image; it is not presented as an authenticated user's profile photo. Dynamic artist images cannot appear alongside worldwide search/playback until a real music catalogue and playback provider/API are connected. Rows currently navigate to feature landing screens where those features are not yet implemented; navigation is not the same as a completed backend feature.
