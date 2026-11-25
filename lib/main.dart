@@ -601,8 +601,120 @@ class _NeroHomeScreenState extends State<NeroHomeScreen> {
   }
 }
 
-class _HomeTab extends StatelessWidget {
+class _HomeTab extends StatefulWidget {
   const _HomeTab();
+
+  @override
+  State<_HomeTab> createState() => _HomeTabState();
+}
+
+class _HomeTabState extends State<_HomeTab> {
+  final AudioPlayer _bannerPlayer = AudioPlayer();
+  List<Map<String, dynamic>> _featuredTracks = [];
+  int _featuredIndex = 0;
+  bool _featuredLoading = false;
+  bool _bannerPlaying = false;
+  String? _loadedFeaturedUrl;
+  StreamSubscription<PlayerState>? _bannerStateSubscription;
+
+  Map<String, dynamic>? get _currentFeatured =>
+      _featuredTracks.isEmpty ? null : _featuredTracks[_featuredIndex];
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadFeaturedTracks());
+    _bannerStateSubscription = _bannerPlayer.playerStateStream.listen((state) {
+      if (mounted) setState(() => _bannerPlaying = state.playing);
+    });
+  }
+
+  @override
+  void dispose() {
+    _bannerStateSubscription?.cancel();
+    _bannerPlayer.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadFeaturedTracks() async {
+    setState(() => _featuredLoading = true);
+    final client = HttpClient();
+    try {
+      final uri = Uri.https('itunes.apple.com', '/search', {
+        'term': 'Afrobeats hits',
+        'entity': 'song',
+        'limit': '25',
+        'media': 'music',
+      });
+      final request = await client.getUrl(uri).timeout(const Duration(seconds: 15));
+      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      final response = await request.close().timeout(const Duration(seconds: 15));
+      if (response.statusCode != HttpStatus.ok) {
+        throw HttpException('Featured music returned ${response.statusCode}.');
+      }
+      final body = await response.transform(utf8.decoder).join();
+      final decoded = jsonDecode(body) as Map<String, dynamic>;
+      final results = decoded['results'] as List<dynamic>? ?? const [];
+      final tracks = results
+          .whereType<Map<String, dynamic>>()
+          .where((track) => track['previewUrl'] is String)
+          .toList();
+      if (mounted) {
+        setState(() {
+          _featuredTracks = tracks;
+          _featuredLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _featuredLoading = false);
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  Future<void> _playFeatured({bool toggle = false, int? targetIndex}) async {
+    if (_featuredTracks.isEmpty) {
+      if (_featuredLoading) return;
+      await _loadFeaturedTracks();
+      if (_featuredTracks.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Featured music is unavailable right now. Try again shortly.')),
+          );
+        }
+        return;
+      }
+    }
+
+    if (targetIndex != null) {
+      _featuredIndex = (targetIndex + _featuredTracks.length) % _featuredTracks.length;
+    }
+    final track = _currentFeatured!;
+    final url = track['previewUrl'] as String?;
+    if (url == null || url.isEmpty) return;
+
+    try {
+      if (toggle && _loadedFeaturedUrl == url) {
+        if (_bannerPlaying) {
+          await _bannerPlayer.pause();
+        } else {
+          unawaited(_bannerPlayer.play());
+        }
+        return;
+      }
+      await _bannerPlayer.setUrl(url);
+      _loadedFeaturedUrl = url;
+      if (mounted) setState(() {});
+      unawaited(_bannerPlayer.play());
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not play this featured preview.')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) => ListView(
         padding: const EdgeInsets.all(20),
@@ -617,14 +729,8 @@ class _HomeTab extends StatelessWidget {
           const SizedBox(height: 18),
           TextField(
             readOnly: true,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute<void>(builder: (_) => const SearchScreen()),
-            ),
-            decoration: const InputDecoration(
-              hintText: 'Search songs, albums and artists',
-              prefixIcon: Icon(Icons.search, color: neroPink),
-            ),
+            onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const SearchScreen())),
+            decoration: const InputDecoration(hintText: 'Search songs, albums and artists', prefixIcon: Icon(Icons.search, color: neroPink)),
           ),
           const SizedBox(height: 22),
           ClipRRect(
@@ -635,24 +741,17 @@ class _HomeTab extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.asset(
-                    'assets/nero_music_banner.webp',
-                    fit: BoxFit.cover,
-                    alignment: Alignment.topCenter,
-                  ),
+                  Image.asset('assets/nero_music_banner.webp', fit: BoxFit.cover, alignment: Alignment.topCenter),
                   DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
-                        colors: [
-                          neroDark.withValues(alpha: 0.04),
-                          neroDark.withValues(alpha: 0.78),
-                        ],
+                        colors: [neroDark.withValues(alpha: 0.04), neroDark.withValues(alpha: 0.82)],
                       ),
                     ),
                   ),
-                  const Positioned(
+                  Positioned(
                     left: 18,
                     right: 18,
                     bottom: 86,
@@ -660,18 +759,21 @@ class _HomeTab extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'FEEL THE MUSIC',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 23,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 1,
-                          ),
+                          _currentFeatured?['trackName']?.toString().toUpperCase() ?? 'FEEL THE MUSIC',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w900, letterSpacing: 1),
                         ),
-                        SizedBox(height: 6),
+                        const SizedBox(height: 6),
                         Text(
-                          'Discover new sounds. Support the artists you love.',
-                          style: TextStyle(color: Colors.white),
+                          _currentFeatured?['artistName']?.toString() ?? 'Discover new sounds. Support the artists you love.',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                        if (_featuredLoading) const Padding(
+                          padding: EdgeInsets.only(top: 8),
+                          child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
                         ),
                       ],
                     ),
@@ -686,18 +788,18 @@ class _HomeTab extends StatelessWidget {
                         _BannerControl(
                           icon: Icons.skip_previous_rounded,
                           label: 'Previous',
-                          onPressed: () => _open(context, 'Previous featured mix'),
+                          onPressed: () => unawaited(_playFeatured(targetIndex: _featuredIndex - 1)),
                         ),
                         _BannerControl(
-                          icon: Icons.play_arrow_rounded,
-                          label: 'Play',
+                          icon: _bannerPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                          label: _bannerPlaying ? 'Pause' : 'Play',
                           prominent: true,
-                          onPressed: () => _open(context, 'Featured music'),
+                          onPressed: () => unawaited(_playFeatured(toggle: true)),
                         ),
                         _BannerControl(
                           icon: Icons.skip_next_rounded,
                           label: 'Next',
-                          onPressed: () => _open(context, 'Next featured mix'),
+                          onPressed: () => unawaited(_playFeatured(targetIndex: _featuredIndex + 1)),
                         ),
                       ],
                     ),
@@ -709,34 +811,14 @@ class _HomeTab extends StatelessWidget {
           const SizedBox(height: 24),
           const Text('Made for you', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _MusicCard(
-                  title: 'Afro-beats',
-                  subtitle: 'Fresh African sounds',
-                  imagePath: 'assets/afrobeats_stage.jpg',
-                  onTap: () => Navigator.push(context, MaterialPageRoute<void>(
-                    builder: (_) => const SearchScreen(initialQuery: 'Afrobeats'),
-                  )),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _MusicCard(
-                  title: 'Late Night',
-                  subtitle: 'R&B and chill',
-                  imagePath: 'assets/late_night_studio.jpg',
-                  onTap: () => Navigator.push(context, MaterialPageRoute<void>(
-                    builder: (_) => const SearchScreen(initialQuery: 'Late Night R&B'),
-                  )),
-                ),
-              ),
-            ],
-          ),
+          Row(children: [
+            Expanded(child: _MusicCard(title: 'Afro-beats', subtitle: 'Fresh African sounds', imagePath: 'assets/afrobeats_stage.jpg', onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const SearchScreen(initialQuery: 'Afrobeats'))))),
+            const SizedBox(width: 12),
+            Expanded(child: _MusicCard(title: 'Late Night', subtitle: 'R&B and chill', imagePath: 'assets/late_night_studio.jpg', onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const SearchScreen(initialQuery: 'Late Night R&B'))))),
+          ]),
           const SizedBox(height: 22),
           const Text('Explore genres', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
-          Wrap(spacing: 8, children: ['Afrobeats', 'Gospel', 'Hip-Hop', 'R&B', 'Pop', 'Highlife'].map((g) => ActionChip(label: Text(g), onPressed: () => _open(context, g))).toList()),
+          Wrap(spacing: 8, children: ['Afrobeats', 'Gospel', 'Hip-Hop', 'R&B', 'Pop', 'Highlife'].map((g) => ActionChip(label: Text(g), onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => SearchScreen(initialQuery: g)))).toList()),
           const SizedBox(height: 20),
           _MenuTile(icon: Icons.mic, title: 'Artist opportunities', subtitle: 'Apply to publish music and earn', onTap: () => _open(context, 'Artist application')),
         ],
