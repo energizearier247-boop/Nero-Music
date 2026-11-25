@@ -1,8 +1,11 @@
 // ignore_for_file: deprecated_member_use
 
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -551,13 +554,13 @@ class _NeroHomeScreenState extends State<NeroHomeScreen> {
   Widget build(BuildContext context) {
     final pages = [
       const _HomeTab(),
-      _ListTab(title: 'Explore', subtitle: 'Find music, artists, albums and playlists.', items: const ['Trending music', 'New releases', 'Top artists', 'Afrobeats', 'Gospel', 'Hip-Hop', 'R&B']),
+      const SearchScreen(),
       _ListTab(title: 'My Library', subtitle: 'Your private music and saved collection.', items: const ['Private music vault', 'My uploads', 'Playlists', 'Favourites', 'Purchased music', 'Downloads']),
       _ListTab(title: 'Earnings', subtitle: 'Artist earnings and transaction history.', items: const ['Available balance', 'Pending earnings', 'Streaming royalties', 'Music sales', 'Withdrawal requests']),
       const _ProfileTab(),
     ];
     return Scaffold(
-      appBar: _index == 0 ? null : AppBar(title: Text(_titles[_index])),
+      appBar: _index == 0 || _index == 1 ? null : AppBar(title: Text(_titles[_index])),
       body: SafeArea(child: pages[_index]),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
@@ -720,89 +723,223 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _query = TextEditingController();
-  static const _discoverable = <String>[
-    'Afrobeats',
-    'Gospel',
-    'Hip-Hop',
-    'R&B',
-    'Pop',
-    'Highlife',
-    'Trending music',
-    'New releases',
-    'Top artists',
-    'Playlists',
-  ];
+  final AudioPlayer _player = AudioPlayer();
+  List<Map<String, dynamic>> _songs = [];
+  List<Map<String, dynamic>> _artists = [];
+  bool _loading = false;
+  String? _error;
+  String? _playingUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _query.text = 'top hits';
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_search('top hits'));
+    });
+  }
 
   @override
   void dispose() {
     _query.dispose();
+    _player.dispose();
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final query = _query.text.trim().toLowerCase();
-    final results = _discoverable
-        .where((item) => item.toLowerCase().contains(query))
-        .toList();
+  Future<List<Map<String, dynamic>>> _itunesSearch(
+    String term, String entity,
+  ) async {
+    final uri = Uri.https('itunes.apple.com', '/search', {
+      'term': term,
+      'entity': entity,
+      'limit': entity == 'song' ? '30' : '12',
+      'media': 'music',
+    });
+    final client = HttpClient();
+    try {
+      final request = await client.getUrl(uri).timeout(const Duration(seconds: 15));
+      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      final response = await request.close().timeout(const Duration(seconds: 15));
+      if (response.statusCode != HttpStatus.ok) {
+        throw HttpException('Music search returned ${response.statusCode}.');
+      }
+      final body = await response.transform(utf8.decoder).join();
+      final decoded = jsonDecode(body) as Map<String, dynamic>;
+      final results = decoded['results'] as List<dynamic>? ?? const [];
+      return results.whereType<Map<String, dynamic>>().toList();
+    } finally {
+      client.close(force: true);
+    }
+  }
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Search music')),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          TextField(
-            controller: _query,
-            autofocus: true,
-            onChanged: (_) => setState(() {}),
-            decoration: InputDecoration(
-              hintText: 'Search genres and music collections',
-              prefixIcon: const Icon(Icons.search, color: neroPink),
-              suffixIcon: _query.text.isEmpty
-                  ? null
-                  : IconButton(
-                      onPressed: () {
-                        _query.clear();
-                        setState(() {});
-                      },
-                      icon: const Icon(Icons.close),
-                    ),
+  Future<void> _search([String? value]) async {
+    final term = (value ?? _query.text).trim();
+    if (term.isEmpty) {
+      setState(() {
+        _songs = [];
+        _artists = [];
+        _error = null;
+      });
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _loading = true;
+      _error = null;
+      _songs = [];
+      _artists = [];
+    });
+    try {
+      final results = await Future.wait([
+        _itunesSearch(term, 'song'),
+        _itunesSearch(term, 'musicArtist'),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _songs = results[0].where((song) => song['previewUrl'] != null).toList();
+        _artists = results[1];
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Could not search music right now. Check your internet connection and try again.';
+      });
+    }
+  }
+
+  Future<void> _playSong(Map<String, dynamic> song) async {
+    final url = song['previewUrl'] as String?;
+    if (url == null || url.isEmpty) return;
+    try {
+      if (_playingUrl == url && _player.playing) {
+        await _player.pause();
+        if (mounted) setState(() {});
+        return;
+      }
+      await _player.setUrl(url);
+      if (mounted) setState(() => _playingUrl = url);
+      unawaited(_player.play());
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This preview could not be played. Please try another track.')),
+      );
+    }
+  }
+
+  Widget _artwork(String? url, {double size = 54}) => ClipRRect(
+    borderRadius: BorderRadius.circular(10),
+    child: url == null
+        ? Container(width: size, height: size, color: neroDarkSurface,
+            child: const Icon(Icons.music_note, color: neroPink))
+        : Image.network(url, width: size, height: size, fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Container(width: size, height: size,
+              color: neroDarkSurface, child: const Icon(Icons.music_note, color: neroPink))),
+  );
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Discover music')),
+    body: ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        TextField(
+          controller: _query,
+          autofocus: true,
+          textInputAction: TextInputAction.search,
+          onSubmitted: _search,
+          decoration: InputDecoration(
+            hintText: 'Search songs or artists worldwide',
+            prefixIcon: const Icon(Icons.search, color: neroPink),
+            suffixIcon: IconButton(
+              tooltip: 'Search',
+              onPressed: _loading ? null : () => _search(),
+              icon: const Icon(Icons.arrow_forward, color: neroPink),
             ),
           ),
-          const SizedBox(height: 20),
-          Text(
-            query.isEmpty ? 'Explore music' : 'Search results',
-            style: const TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
-          ),
+        ),
+        const SizedBox(height: 20),
+        if (_loading) const Center(child: Padding(
+          padding: EdgeInsets.all(28), child: CircularProgressIndicator(),
+        )),
+        if (_error != null) Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          child: Text(_error!, textAlign: TextAlign.center),
+        ),
+        if (!_loading && _artists.isNotEmpty) ...[
+          const Text('Artists', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
-          if (results.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 28),
-              child: Text(
-                'No matching genres or collections. A live song and artist '
-                'catalogue will appear here once a music provider is connected.',
-                textAlign: TextAlign.center,
-              ),
-            )
-          else
-            for (final item in results)
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.graphic_eq, color: neroPink),
-                  title: Text(item),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => _open(context, item),
-                ),
-              ),
-          const SizedBox(height: 14),
-          const Text(
-            'Song and artist search requires a connected music catalogue.',
-            style: TextStyle(color: neroPink),
+          SizedBox(
+            height: 130,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _artists.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 14),
+              itemBuilder: (context, index) {
+                final artist = _artists[index];
+                return SizedBox(width: 92, child: Column(children: [
+                  CircleAvatar(
+                    radius: 34,
+                    backgroundColor: neroDarkSurface,
+                    backgroundImage: _songs.where((song) => song['artistName'] == artist['artistName'] && song['artworkUrl100'] != null).isNotEmpty
+                      ? NetworkImage(_songs.firstWhere((song) => song['artistName'] == artist['artistName'] && song['artworkUrl100'] != null)['artworkUrl100'] as String)
+                      : null,
+                    child: _songs.where((song) => song['artistName'] == artist['artistName'] && song['artworkUrl100'] != null).isEmpty
+                      ? const Icon(Icons.person, color: neroPink, size: 34) : null,
+                  ),
+                  const SizedBox(height: 7),
+                  Text(artist['artistName']?.toString() ?? 'Artist',
+                    maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                ]));
+              },
+            ),
           ),
         ],
-      ),
-    );
-  }
+        if (!_loading && _songs.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          const Text('Songs', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          for (final song in _songs)
+            Card(child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+              leading: _artwork(song['artworkUrl100'] as String?),
+              title: Text(song['trackName']?.toString() ?? 'Unknown track', maxLines: 1, overflow: TextOverflow.ellipsis),
+              subtitle: Text(song['artistName']?.toString() ?? 'Unknown artist', maxLines: 1, overflow: TextOverflow.ellipsis),
+              trailing: IconButton(
+                tooltip: _playingUrl == song['previewUrl'] && _player.playing ? 'Pause preview' : 'Play preview',
+                icon: Icon(_playingUrl == song['previewUrl'] && _player.playing
+                  ? Icons.pause_circle_filled : Icons.play_circle_fill,
+                  color: neroPink, size: 34),
+                onPressed: () => _playSong(song),
+              ),
+            )),
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Text('Play buttons stream the available track preview. Full-length playback depends on a licensed music-streaming provider.',
+              style: TextStyle(fontSize: 12, color: Colors.grey)),
+          ),
+        ],
+        if (!_loading && _query.text.trim().isNotEmpty && _songs.isEmpty && _artists.isEmpty && _error == null)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 30),
+            child: Text('No matching songs or artists found. Try another spelling or search term.', textAlign: TextAlign.center),
+          ),
+        if (!_loading && _query.text.trim().isEmpty) ...[
+          const Text('Start exploring', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            'Afrobeats', 'Gospel', 'Hip-Hop', 'R&B', 'Pop', 'Highlife',
+          ].map((genre) => ActionChip(
+            label: Text(genre),
+            onPressed: () { _query.text = genre; _search(genre); },
+          )).toList()),
+        ],
+      ],
+    ),
+  );
 }
 
 class _BannerControl extends StatelessWidget {
@@ -879,7 +1016,7 @@ class _ProfileTab extends StatelessWidget {
                   child: Image.asset(
                     'assets/nero_profile_photo.jpg',
                     fit: BoxFit.cover,
-                    alignment: Alignment.topCenter,
+                    alignment: const Alignment(0, -0.12),
                   ),
                 ),
                 Container(
@@ -978,7 +1115,7 @@ class DetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text(title)), body: Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
     const Icon(Icons.graphic_eq, color: neroPink, size: 52), const SizedBox(height: 14), Text(title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-    const SizedBox(height: 8), const Text('This section is ready for its service connection. Live music playback, worldwide song search, artist catalogues, royalties and payments require their respective provider integrations.'),
+    const SizedBox(height: 8), const Text('Explore this Nero Music section. More features will appear here as they become available.'),
   ]))));
 }
 
