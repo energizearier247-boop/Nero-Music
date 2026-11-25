@@ -580,7 +580,7 @@ class _NeroHomeScreenState extends State<NeroHomeScreen> {
       const _HomeTab(),
       const SearchScreen(),
       const LibraryScreen(),
-      _ListTab(title: 'Earnings', subtitle: 'Artist earnings and transaction history.', items: const ['Available balance', 'Pending earnings', 'Streaming royalties', 'Music sales', 'Withdrawal requests']),
+      const _OwnerEarningsTab(),
       const _ProfileTab(),
     ];
     return Scaffold(
@@ -1298,6 +1298,112 @@ class _LibraryScreenState extends State<LibraryScreen> {
       ]);
     },
   );
+}
+
+class SubscriptionScreen extends StatefulWidget {
+  const SubscriptionScreen({super.key});
+
+  @override
+  State<SubscriptionScreen> createState() => _SubscriptionScreenState();
+}
+
+class _SubscriptionScreenState extends State<SubscriptionScreen> {
+  bool _busy = false;
+  String? _message;
+
+  Future<void> _startCheckout() async {
+    if (Supabase.instance.client.auth.currentUser == null) {
+      setState(() => _message = 'Please sign in before subscribing.');
+      return;
+    }
+    setState(() { _busy = true; _message = null; });
+    try {
+      // The secure Edge Function must be deployed and configured with Paystack
+      // secret keys before checkout can be enabled in production.
+      final response = await Supabase.instance.client.functions.invoke(
+        'create-subscription-checkout',
+        body: {'plan': 'listener_monthly', 'amount_kobo': 200000},
+      );
+      final data = response.data;
+      if (data is Map && data['checkout_url'] is String) {
+        setState(() => _message =
+            'Checkout is ready. Open this link in your browser: ${data['checkout_url']}');
+      } else {
+        setState(() => _message =
+            'Payment setup is not complete yet. No payment has been taken.');
+      }
+    } catch (_) {
+      setState(() => _message =
+          'Could not start checkout. Please try again later. No payment has been taken.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Nero Music Premium')),
+    body: ListView(padding: const EdgeInsets.all(20), children: [
+      Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(colors: [neroRed, neroPink]),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(Icons.headphones, color: Colors.white, size: 34),
+          SizedBox(height: 18),
+          Text('LISTENER MONTHLY', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700, letterSpacing: 1.2)),
+          SizedBox(height: 8),
+          Text('₦2,000 / month', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900)),
+          SizedBox(height: 8),
+          Text('Stream music with a monthly membership.', style: TextStyle(color: Colors.white)),
+        ]),
+      ),
+      const SizedBox(height: 22),
+      const Text('Your membership', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+      const SizedBox(height: 12),
+      const ListTile(leading: Icon(Icons.check_circle_outline, color: neroPink), title: Text('Monthly access to listener streaming')),
+      const ListTile(leading: Icon(Icons.check_circle_outline, color: neroPink), title: Text('Secure payment confirmation')),
+      const ListTile(leading: Icon(Icons.check_circle_outline, color: neroPink), title: Text('Manage renewal and cancellation')),
+      const SizedBox(height: 14),
+      FilledButton(
+        onPressed: _busy ? null : _startCheckout,
+        child: Text(_busy ? 'Preparing checkout…' : 'Subscribe for ₦2,000/month'),
+      ),
+      if (_message != null) ...[
+        const SizedBox(height: 14),
+        SelectableText(_message!, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+      ],
+      const SizedBox(height: 12),
+      const Text('Subscription billing will only begin after secure checkout and payment verification are configured.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+    ]),
+  );
+}
+
+class _OwnerEarningsTab extends StatelessWidget {
+  const _OwnerEarningsTab();
+
+  @override
+  Widget build(BuildContext context) => ListView(padding: const EdgeInsets.all(20), children: [
+    const Text('Owner Earnings', style: TextStyle(fontSize: 27, fontWeight: FontWeight.bold)),
+    const SizedBox(height: 6),
+    Text('Subscription revenue collected by Nero Music.', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+    const SizedBox(height: 22),
+    Card(child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Text('Total subscription revenue', style: TextStyle(fontWeight: FontWeight.w600)),
+      const SizedBox(height: 10),
+      const Text('₦0.00', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900)),
+      const SizedBox(height: 6),
+      const Text('Revenue will appear here after verified payments are connected.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+    ]))),
+    const SizedBox(height: 14),
+    const Card(child: ListTile(leading: Icon(Icons.receipt_long, color: neroPink), title: Text('Payment records'), subtitle: Text('Verified subscription transactions'))),
+    const Card(child: ListTile(leading: Icon(Icons.autorenew, color: neroPink), title: Text('Active subscriptions'), subtitle: Text('Current paid memberships'))),
+    const Card(child: ListTile(leading: Icon(Icons.pending_actions, color: neroPink), title: Text('Renewals and cancellations'), subtitle: Text('Subscription status and billing events'))),
+    const SizedBox(height: 8),
+    const Text('Owner totals must be populated from verified payment webhooks, not from play counts. The secure backend and owner-only access rules are required before this dashboard can show live financial data.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+  ]);
 }
 
 class _ListTab extends StatelessWidget {
