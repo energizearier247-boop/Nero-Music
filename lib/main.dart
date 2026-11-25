@@ -293,7 +293,10 @@ class _AuthScreenState extends State<AuthScreen> {
       return;
     }
     try {
-      await Supabase.instance.client.auth.resetPasswordForEmail(\n        email,\n        redirectTo: neroAuthRedirectUrl,\n      );
+      await Supabase.instance.client.auth.resetPasswordForEmail(
+        email,
+        redirectTo: neroAuthRedirectUrl,
+      );
       if (mounted) {
         _message('Password reset instructions have been sent if the account exists.');
       }
@@ -496,101 +499,4 @@ class _HomeTab extends StatelessWidget {
           const SizedBox(height: 24),
           const Text('Made for you', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
-          Row(children: [Expanded(child: _MusicCard(title: 'Afrobeats Mix', subtitle: 'Fresh African sounds', icon: Icons.album)), const SizedBox(width: 12), Expanded(child: _MusicCard(title: 'Late Night', subtitle: 'R&B and chill', icon: Icons.nightlight_round))]),
-          const SizedBox(height: 22),
-          const Text('Explore genres', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
-          Wrap(spacing: 8, children: ['Afrobeats', 'Gospel', 'Hip-Hop', 'R&B', 'Pop', 'Highlife'].map((g) => ActionChip(label: Text(g), onPressed: () => _open(context, g))).toList()),
-          const SizedBox(height: 20),
-          _MenuTile(icon: Icons.mic, title: 'Artist opportunities', subtitle: 'Apply to publish music and earn', onTap: () => _open(context, 'Artist application')),
-        ],
-      );
-}
-
-class _ListTab extends StatelessWidget {
-  const _ListTab({required this.title, required this.subtitle, required this.items});
-  final String title;
-  final String subtitle;
-  final List<String> items;
-  @override
-  Widget build(BuildContext context) => ListView(padding: const EdgeInsets.all(20), children: [
-    Text(title, style: const TextStyle(fontSize: 27, fontWeight: FontWeight.bold)),
-    const SizedBox(height: 7), Text(subtitle, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-    const SizedBox(height: 22),
-    for (final item in items) _MenuTile(icon: title == 'Explore' ? Icons.explore : title == 'My Library' ? Icons.library_music : title == 'Earnings' ? Icons.account_balance_wallet : Icons.person, title: item, onTap: () { if (item == 'Settings') { Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const SettingsScreen())); } else { _open(context, item); } }),
-  ]);
-}
-
-class _MenuTile extends StatelessWidget {
-  const _MenuTile({required this.icon, required this.title, this.subtitle, required this.onTap});
-  final IconData icon;
-  final String title;
-  final String? subtitle;
-  final VoidCallback onTap;
-  @override
-  Widget build(BuildContext context) => Card(margin: const EdgeInsets.only(bottom: 12), child: ListTile(
-    contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
-    leading: Icon(icon, color: neroPink), title: Text(title), subtitle: subtitle == null ? null : Text(subtitle!),
-    trailing: const Icon(Icons.chevron_right), onTap: onTap,
-  ));
-}
-
-class _MusicCard extends StatelessWidget {
-  const _MusicCard({required this.title, required this.subtitle, required this.icon});
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  @override
-  Widget build(BuildContext context) => InkWell(onTap: () => _open(context, title), child: Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    Container(height: 85, decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), gradient: const LinearGradient(colors: [neroRed, neroPink])), child: Icon(icon, color: Colors.white, size: 40)),
-    const SizedBox(height: 10), Text(title, style: const TextStyle(fontWeight: FontWeight.bold)), Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
-  ]))));
-}
-
-void _open(BuildContext context, String title) {
-  Navigator.push(context, MaterialPageRoute<void>(builder: (_) => DetailScreen(title: title)));
-}
-
-class DetailScreen extends StatelessWidget {
-  const DetailScreen({super.key, required this.title});
-  final String title;
-  @override
-  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text(title)), body: Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
-    const Icon(Icons.graphic_eq, color: neroPink, size: 52), const SizedBox(height: 14), Text(title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-    const SizedBox(height: 8), const Text('This section will be activated as its Stage 2 feature is connected.'),
-  ]))));
-}
-
-class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
-  @override
-  Widget build(BuildContext context) {
-    final app = NeroMusicApp.of(context);
-    return Scaffold(appBar: AppBar(title: const Text('Settings')), body: ListView(padding: const EdgeInsets.all(20), children: [
-      const Text('Appearance', style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold)),
-      const SizedBox(height: 12),
-      SwitchListTile(value: Theme.of(context).brightness == Brightness.dark, activeThumbColor: neroPink, title: const Text('Dark mode'), subtitle: const Text('Turn dark appearance on or off'), onChanged: app.setDarkMode),
-      const Divider(),
-      ListTile(leading: const Icon(Icons.logout, color: neroPink), title: const Text('Sign out'), onTap: () async {
-        await Supabase.instance.client.auth.signOut();
-        if (context.mounted) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute<void>(builder: (_) => const WelcomeScreen()),
-            (_) => false,
-          );
-        }
-      }),
-    ]));
-  }
-}
-
-class _PrimaryButton extends StatelessWidget {
-  const _PrimaryButton({required this.label, required this.onPressed});
-  final String label;
-  final VoidCallback? onPressed;
-  @override
-  Widget build(BuildContext context) => SizedBox(height: 54, child: FilledButton(
-    onPressed: onPressed,
-    style: FilledButton.styleFrom(backgroundColor: neroRed, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-    child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-  ));
-}
+          Row(children: [Expanded(child: _MusicCard(title: 'Afrobeats Mix', subtitle:
