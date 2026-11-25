@@ -25,6 +25,10 @@ const neroAuthRedirectUrl = 'com.neromusic://login-callback';
 final GlobalKey<ScaffoldMessengerState> neroScaffoldMessengerKey =
     GlobalKey<ScaffoldMessengerState>();
 
+/// Allows authentication flows to navigate after async work without using a
+/// BuildContext that may no longer be mounted.
+final GlobalKey<NavigatorState> neroNavigatorKey = GlobalKey<NavigatorState>();
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Supabase.initialize(url: supabaseUrl, anonKey: supabasePublishableKey);
@@ -158,6 +162,7 @@ class NeroMusicAppState extends State<NeroMusicApp> {
         title: 'Nero Music',
         debugShowCheckedModeBanner: false,
         scaffoldMessengerKey: neroScaffoldMessengerKey,
+        navigatorKey: neroNavigatorKey,
         theme: _theme(Brightness.light),
         darkTheme: _theme(Brightness.dark),
         themeMode: _themeMode,
@@ -300,11 +305,12 @@ class _AuthScreenState extends State<AuthScreen> {
         } else {
           await prefs.setBool('nero_pending_email_verification', true);
         }
+        if (!mounted) return;
         _message(verifiedImmediately
             ? 'Your account has been created.'
             : 'Registration submitted. Check your email to verify your account before signing in.');
         if (verifiedImmediately) {
-          Navigator.of(context).pushAndRemoveUntil(
+          neroNavigatorKey.currentState?.pushAndRemoveUntil(
               MaterialPageRoute<void>(builder: (_) => const NeroHomeScreen()), (_) => false);
         }
       } else {
@@ -312,7 +318,7 @@ class _AuthScreenState extends State<AuthScreen> {
         if (!mounted) {
       return;
     }
-        Navigator.of(context).pushAndRemoveUntil(
+        neroNavigatorKey.currentState?.pushAndRemoveUntil(
             MaterialPageRoute<void>(builder: (_) => const NeroHomeScreen()), (_) => false);
       }
     } on AuthException catch (error) {
