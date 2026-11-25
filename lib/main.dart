@@ -517,8 +517,10 @@ class _PasswordUpdateScreenState extends State<PasswordUpdateScreen> {
         _message('Unable to update your password. Please try again.');
       }
     } finally {
-      if (mounted) setState(() {
-        => _busy = false);
+      if (mounted) {
+        setState(() {
+          _busy = false;
+        });
       }
     }
   }
@@ -852,14 +854,16 @@ class _SearchScreenState extends State<SearchScreen> {
     try {
       if (_playingUrl == url && _player.playing) {
         await _player.pause();
-        if (mounted) setState(() {
-          {});
+        if (mounted) {
+          setState(() {});
         }
         return;
       }
       await _player.setUrl(url);
-      if (mounted) setState(() {
-        => _playingUrl = url);
+      if (mounted) {
+        setState(() {
+          _playingUrl = url;
+        });
       }
       unawaited(_player.play());
     } catch (_) {
