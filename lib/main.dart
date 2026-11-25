@@ -1406,21 +1406,6 @@ class _OwnerEarningsTab extends StatelessWidget {
   ]);
 }
 
-class _ListTab extends StatelessWidget {
-  const _ListTab({required this.title, required this.subtitle, required this.items});
-  final String title;
-  final String subtitle;
-  final List<String> items;
-  @override
-  Widget build(BuildContext context) => ListView(padding: const EdgeInsets.all(20), children: [
-    Text(title, style: const TextStyle(fontSize: 27, fontWeight: FontWeight.bold)),
-    const SizedBox(height: 7), Text(subtitle, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-    const SizedBox(height: 22),
-    for (final item in items) _MenuTile(icon: title == 'Explore' ? Icons.explore : title == 'My Library' ? Icons.library_music : title == 'Earnings' ? Icons.account_balance_wallet : Icons.person, title: item, onTap: () { if (item == 'Settings') { Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const SettingsScreen())); } else { _open(context, item); } }),
-  ]);
-}
-
-
 class _ProfileTab extends StatelessWidget {
   const _ProfileTab();
 
