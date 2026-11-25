@@ -1,30 +1,28 @@
-NERO MUSIC UPDATE NOTES
+NERO MUSIC - MUSIC DISCOVERY AND PROFILE UPDATE
 
 Changes in this update:
-- Reworked the email-verification return flow to clear the existing navigation
-  stack and open the Sign In screen after Supabase confirms the pending signup.
-- Added a guard against duplicate verification redirects.
-- Changed the Home promotional image into a taller portrait banner.
-- Added previous, play, and next controls to the banner.
-- Reduced the Afrobeats Mix and Late Night category icon sizes.
-- Replaced the Home search placeholder with a searchable Explore screen for the
-  genres and collections already represented in the app.
+- Replaced the Profile banner photo with the newly approved portrait supplied
+  for this update, keeping the existing banner layout and improving its crop.
+- Connected the Explore tab and Home search entry point to live music search.
+- Added song and artist search using the public Apple iTunes Search API.
+- Added track artwork, song titles, artist names, and playable track previews.
+- Added genre quick-search chips and clearer no-results / network-error states.
+- Removed generic service-connection wording from placeholder detail pages.
+- Added just_audio for preview playback.
+- Preserved the approved Home portrait banner and its controls.
 
-Important integration limits:
-- This project does not contain audio files or a connected music catalogue API.
-  The banner controls and category/detail routes are UI entry points, not a
-  working streaming player.
-- Live worldwide song/artist search, streaming playback, artist profiles,
-  uploads, royalty accounting, wallet balances, purchases, and withdrawals
-  require backend/catalogue/payment integrations. No provider credentials or
-  service configuration were supplied, so this update does not fabricate them.
-- Supabase must allow the redirect URL `com.neromusic://login-callback` in its
-  Authentication URL configuration, and the Android app must retain the
-  matching intent filter. The existing workflow configures the Android intent
-  filter when it generates the Android project.
+Music catalogue and playback notes:
+- Search queries the Apple iTunes Search API over the internet. Catalogue
+  availability varies by territory and provider metadata.
+- The API supplies short preview clips where available; this is not a full-song
+  streaming licence or a complete worldwide streaming subscription.
+- Full-length playback, complete artist biographies/discographies, artist
+  uploads, royalties, wallet balances, purchases and withdrawals still require
+  licensed provider and backend integrations. No private credentials were
+  supplied, so none have been fabricated.
 
 Validation:
-- ZIP integrity was checked after packaging.
-- Flutter analyze, Flutter tests, and APK build were NOT run in this environment
-  because the Flutter/Dart SDK is unavailable here. Run the existing GitHub
-  Actions workflow to perform those checks.
+- ZIP integrity checked after packaging.
+- Flutter analyze, tests and Android APK build could not be run because the
+  Flutter/Dart SDK is not installed in this environment. Run the repository's
+  GitHub Actions workflow to validate dependencies and build the APK.
