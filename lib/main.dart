@@ -555,7 +555,7 @@ class _NeroHomeScreenState extends State<NeroHomeScreen> {
     final pages = [
       const _HomeTab(),
       const SearchScreen(),
-      _ListTab(title: 'My Library', subtitle: 'Your private music and saved collection.', items: const ['Private music vault', 'My uploads', 'Playlists', 'Favourites', 'Purchased music', 'Downloads']),
+      const LibraryScreen(),
       _ListTab(title: 'Earnings', subtitle: 'Artist earnings and transaction history.', items: const ['Available balance', 'Pending earnings', 'Streaming royalties', 'Music sales', 'Withdrawal requests']),
       const _ProfileTab(),
     ];
@@ -689,9 +689,12 @@ class _HomeTab extends StatelessWidget {
             children: [
               Expanded(
                 child: _MusicCard(
-                  title: 'Afrobeats Mix',
+                  title: 'Afro-beats',
                   subtitle: 'Fresh African sounds',
-                  icon: Icons.album,
+                  imagePath: 'assets/afrobeats_stage.jpg',
+                  onTap: () => Navigator.push(context, MaterialPageRoute<void>(
+                    builder: (_) => const SearchScreen(initialQuery: 'Afrobeats'),
+                  )),
                 ),
               ),
               const SizedBox(width: 12),
@@ -699,7 +702,10 @@ class _HomeTab extends StatelessWidget {
                 child: _MusicCard(
                   title: 'Late Night',
                   subtitle: 'R&B and chill',
-                  icon: Icons.nightlight_round,
+                  imagePath: 'assets/late_night_studio.jpg',
+                  onTap: () => Navigator.push(context, MaterialPageRoute<void>(
+                    builder: (_) => const SearchScreen(initialQuery: 'Late Night R&B'),
+                  )),
                 ),
               ),
             ],
@@ -715,7 +721,8 @@ class _HomeTab extends StatelessWidget {
 
 
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({super.key});
+  const SearchScreen({super.key, this.initialQuery = 'top hits'});
+  final String initialQuery;
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -733,9 +740,9 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void initState() {
     super.initState();
-    _query.text = 'top hits';
+    _query.text = widget.initialQuery;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) unawaited(_search('top hits'));
+      if (mounted) unawaited(_search(widget.initialQuery));
     });
   }
 
@@ -908,12 +915,21 @@ class _SearchScreenState extends State<SearchScreen> {
               leading: _artwork(song['artworkUrl100'] as String?),
               title: Text(song['trackName']?.toString() ?? 'Unknown track', maxLines: 1, overflow: TextOverflow.ellipsis),
               subtitle: Text(song['artistName']?.toString() ?? 'Unknown artist', maxLines: 1, overflow: TextOverflow.ellipsis),
-              trailing: IconButton(
-                tooltip: _playingUrl == song['previewUrl'] && _player.playing ? 'Pause preview' : 'Play preview',
-                icon: Icon(_playingUrl == song['previewUrl'] && _player.playing
-                  ? Icons.pause_circle_filled : Icons.play_circle_fill,
-                  color: neroPink, size: 34),
-                onPressed: () => _playSong(song),
+              trailing: PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert, color: neroPink),
+                onSelected: (action) async {
+                  if (action == 'play') { await _playSong(song); return; }
+                  final result = await LibraryStore.add(action, song);
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result)));
+                },
+                itemBuilder: (_) => const [
+                  PopupMenuItem(value: 'play', child: Text('Play preview')),
+                  PopupMenuItem(value: 'Private Music Vault', child: Text('Save to Private Vault')),
+                  PopupMenuItem(value: 'Favourites', child: Text('Add to Favourites')),
+                  PopupMenuItem(value: 'Downloads', child: Text('Add to Downloads list')),
+                  PopupMenuItem(value: 'Purchased Music', child: Text('Add to Purchased list')),
+                ],
               ),
             )),
           const Padding(
@@ -981,6 +997,154 @@ class _BannerControl extends StatelessWidget {
           ),
         ],
       );
+}
+
+class LibraryStore {
+  static const _key = 'nero_library_collections_v1';
+  static const sections = <String>[
+    'Private Music Vault', 'My Uploads', 'Playlists', 'Favourites',
+    'Purchased Music', 'Downloads',
+  ];
+
+  static Future<Map<String, List<Map<String, dynamic>>>> load() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_key);
+    if (raw == null) return {for (final section in sections) section: <Map<String, dynamic>>[]};
+    try {
+      final decoded = jsonDecode(raw) as Map<String, dynamic>;
+      return {
+        for (final section in sections)
+          section: ((decoded[section] as List<dynamic>?) ?? const [])
+              .whereType<Map<String, dynamic>>()
+              .map((entry) => Map<String, dynamic>.from(entry)).toList(),
+      };
+    } catch (_) {
+      return {for (final section in sections) section: <Map<String, dynamic>>[]};
+    }
+  }
+
+  static Future<String> add(String section, Map<String, dynamic> song) async {
+    final data = await load();
+    final items = data[section] ?? <Map<String, dynamic>>[];
+    final id = song['trackId']?.toString() ?? song['trackName']?.toString() ?? '';
+    if (items.any((item) => (item['trackId']?.toString() ?? item['trackName']?.toString()) == id)) {
+      return 'This track is already in $section.';
+    }
+    items.add({
+      'trackId': song['trackId'],
+      'trackName': song['trackName']?.toString() ?? 'Untitled track',
+      'artistName': song['artistName']?.toString() ?? 'Unknown artist',
+      'artworkUrl100': song['artworkUrl100'],
+      'previewUrl': song['previewUrl'],
+      'savedAt': DateTime.now().toIso8601String(),
+    });
+    data[section] = items;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_key, jsonEncode(data));
+    return 'Saved to $section.';
+  }
+
+  static Future<void> remove(String section, Map<String, dynamic> item) async {
+    final data = await load();
+    data[section]?.removeWhere((entry) => entry['savedAt'] == item['savedAt']);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_key, jsonEncode(data));
+  }
+
+  static Future<String> addPlaylist(String name) async {
+    final clean = name.trim();
+    if (clean.isEmpty) return 'Enter a playlist name.';
+    final data = await load();
+    final playlists = data['Playlists']!;
+    if (playlists.any((item) => item['trackName'] == clean)) return 'That playlist already exists.';
+    playlists.add({'trackName': clean, 'artistName': 'Playlist', 'savedAt': DateTime.now().toIso8601String(), 'isPlaylist': true});
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_key, jsonEncode(data));
+    return 'Playlist created.';
+  }
+}
+
+class LibraryScreen extends StatefulWidget {
+  const LibraryScreen({super.key});
+  @override
+  State<LibraryScreen> createState() => _LibraryScreenState();
+}
+
+class _LibraryScreenState extends State<LibraryScreen> {
+  String _section = LibraryStore.sections.first;
+  Future<Map<String, List<Map<String, dynamic>>>>? _future;
+  @override
+  void initState() { super.initState(); _future = LibraryStore.load(); }
+  void _refresh() => setState(() => _future = LibraryStore.load());
+
+  Future<void> _createPlaylist() async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(context: context, builder: (context) => AlertDialog(
+      title: const Text('New playlist'),
+      content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(labelText: 'Playlist name')),
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')), ElevatedButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('Create'))],
+    ));
+    controller.dispose();
+    if (name == null) return;
+    final message = await LibraryStore.addPlaylist(name);
+    if (!mounted) return;
+    _refresh();
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _addUpload() async {
+    final title = TextEditingController();
+    final artist = TextEditingController();
+    final values = await showDialog<List<String>>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Add upload details'),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: title, decoration: const InputDecoration(labelText: 'Track title')),
+        TextField(controller: artist, decoration: const InputDecoration(labelText: 'Artist')),
+      ]),
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')), ElevatedButton(onPressed: () => Navigator.pop(context, [title.text, artist.text]), child: const Text('Save'))],
+    ));
+    if (values == null || values.first.trim().isEmpty) return;
+    final result = await LibraryStore.add('My Uploads', {'trackName': values.first.trim(), 'artistName': values[1].trim().isEmpty ? 'Unknown artist' : values[1].trim(), 'savedAt': DateTime.now().toIso8601String()});
+    if (!mounted) return;
+    _refresh();
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result)));
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<Map<String, List<Map<String, dynamic>>>>(
+    future: _future,
+    builder: (context, snapshot) {
+      final data = snapshot.data ?? {for (final section in LibraryStore.sections) section: <Map<String, dynamic>>[]};
+      final items = data[_section] ?? <Map<String, dynamic>>[];
+      return ListView(padding: const EdgeInsets.all(18), children: [
+        const Text('Your Library', style: TextStyle(fontSize: 27, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 5),
+        Text('Your music, kept together on this device.', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+        const SizedBox(height: 16),
+        Wrap(spacing: 8, runSpacing: 8, children: [for (final section in LibraryStore.sections) ChoiceChip(
+          label: Text(section), selected: _section == section, onSelected: (_) => setState(() => _section = section),
+        )]),
+        const SizedBox(height: 16),
+        if (_section == 'Playlists') Align(alignment: Alignment.centerLeft, child: FilledButton.icon(onPressed: _createPlaylist, icon: const Icon(Icons.add), label: const Text('Create playlist'))),
+        if (_section == 'My Uploads') Align(alignment: Alignment.centerLeft, child: FilledButton.icon(onPressed: _addUpload, icon: const Icon(Icons.add), label: const Text('Add upload details'))),
+        const SizedBox(height: 10),
+        if (snapshot.connectionState == ConnectionState.waiting) const Center(child: CircularProgressIndicator()),
+        if (items.isEmpty && snapshot.connectionState != ConnectionState.waiting) Padding(
+          padding: const EdgeInsets.symmetric(vertical: 28), child: Column(children: [
+            Icon(Icons.library_music_outlined, size: 42, color: Theme.of(context).colorScheme.onSurfaceVariant),
+            const SizedBox(height: 10), Text(_section == 'My Uploads' ? 'Add your track details to start your uploads list.' : _section == 'Playlists' ? 'Create a playlist to organize your music.' : 'No items saved here yet.', textAlign: TextAlign.center),
+            if (_section == 'Purchased Music' || _section == 'Downloads') const Padding(padding: EdgeInsets.only(top: 8), child: Text('This list stores track details. It does not purchase or download audio files.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Colors.grey))),
+          ]),
+        ),
+        for (final item in items) Card(child: ListTile(
+          leading: item['artworkUrl100'] is String ? ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.network(item['artworkUrl100'] as String, width: 48, height: 48, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.music_note))) : const Icon(Icons.music_note, color: neroPink),
+          title: Text(item['trackName']?.toString() ?? 'Untitled'),
+          subtitle: Text(item['artistName']?.toString() ?? ''),
+          trailing: IconButton(icon: const Icon(Icons.delete_outline), onPressed: () async { await LibraryStore.remove(_section, item); _refresh(); }),
+        )),
+      ]);
+    },
+  );
 }
 
 class _ListTab extends StatelessWidget {
@@ -1094,15 +1258,33 @@ class _MenuTile extends StatelessWidget {
 }
 
 class _MusicCard extends StatelessWidget {
-  const _MusicCard({required this.title, required this.subtitle, required this.icon});
+  const _MusicCard({required this.title, required this.subtitle, required this.imagePath, required this.onTap});
   final String title;
   final String subtitle;
-  final IconData icon;
+  final String imagePath;
+  final VoidCallback onTap;
   @override
-  Widget build(BuildContext context) => InkWell(onTap: () => _open(context, title), child: Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    Container(height: 85, decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), gradient: const LinearGradient(colors: [neroRed, neroPink])), child: Icon(icon, color: Colors.white, size: 25)),
-    const SizedBox(height: 10), Text(title, style: const TextStyle(fontWeight: FontWeight.bold)), Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
-  ]))));
+  Widget build(BuildContext context) => InkWell(
+    borderRadius: BorderRadius.circular(18),
+    onTap: onTap,
+    child: Card(
+      clipBehavior: Clip.antiAlias,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        SizedBox(
+          height: 116, width: double.infinity,
+          child: Image.asset(imagePath, fit: BoxFit.cover, alignment: Alignment.center),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 3),
+            Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall),
+          ]),
+        ),
+      ]),
+    ),
+  );
 }
 
 void _open(BuildContext context, String title) {
