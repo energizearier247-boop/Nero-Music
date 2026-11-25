@@ -51,6 +51,7 @@ class NeroMusicAppState extends State<NeroMusicApp> {
   Session? _session;
   bool _passwordRecovery = false;
   bool _showSignInAfterVerification = false;
+  bool _verificationRedirectInProgress = false;
 
   @override
   void initState() {
@@ -64,33 +65,22 @@ class NeroMusicAppState extends State<NeroMusicApp> {
 
   Future<void> _restorePendingVerification() async {
     final prefs = await SharedPreferences.getInstance();
-    final pending = prefs.getBool('nero_pending_email_verification') ?? false;
-    if (!pending || Supabase.instance.client.auth.currentSession == null) {
-      return;
+    final pending =
+        prefs.getBool('nero_pending_email_verification') ?? false;
+    if (pending && Supabase.instance.client.auth.currentSession != null) {
+      await _redirectToSignInAfterVerification();
     }
-    await prefs.remove('nero_pending_email_verification');
-    await Supabase.instance.client.auth.signOut();
-    if (!mounted) return;
-    setState(() {
-      _session = null;
-      _showSignInAfterVerification = true;
-    });
   }
 
   Future<void> _handleAuthState(AuthState state) async {
-    final prefs = await SharedPreferences.getInstance();
-    final pending = prefs.getBool('nero_pending_email_verification') ?? false;
-
-    if (state.event == AuthChangeEvent.signedIn && pending) {
-      await prefs.remove('nero_pending_email_verification');
-      await Supabase.instance.client.auth.signOut();
-      if (!mounted) return;
-      setState(() {
-        _session = null;
-        _passwordRecovery = false;
-        _showSignInAfterVerification = true;
-      });
-      return;
+    if (state.session != null) {
+      final prefs = await SharedPreferences.getInstance();
+      final pending =
+          prefs.getBool('nero_pending_email_verification') ?? false;
+      if (pending) {
+        await _redirectToSignInAfterVerification();
+        return;
+      }
     }
 
     if (!mounted) return;
@@ -98,6 +88,38 @@ class NeroMusicAppState extends State<NeroMusicApp> {
       _session = state.session;
       _passwordRecovery = state.event == AuthChangeEvent.passwordRecovery;
     });
+  }
+
+  Future<void> _redirectToSignInAfterVerification() async {
+    if (_verificationRedirectInProgress) return;
+    _verificationRedirectInProgress = true;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('nero_pending_email_verification');
+      await Supabase.instance.client.auth.signOut();
+
+      if (!mounted) return;
+      setState(() {
+        _session = null;
+        _passwordRecovery = false;
+        _showSignInAfterVerification = true;
+      });
+
+      // Replace the complete navigation stack. This prevents the Android
+      // back button from returning to Create Account or the verification flow.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        neroNavigatorKey.currentState?.pushAndRemoveUntil(
+          MaterialPageRoute<void>(
+            builder: (_) =>
+                const AuthScreen(signUp: false, accountType: 'Listener'),
+          ),
+          (_) => false,
+        );
+      });
+    } finally {
+      _verificationRedirectInProgress = false;
+    }
   }
 
   @override
@@ -566,12 +588,22 @@ class _HomeTab extends StatelessWidget {
             IconButton(onPressed: () => _open(context, 'Notifications'), icon: const Icon(Icons.notifications_none)),
           ]),
           const SizedBox(height: 18),
-          TextField(readOnly: true, onTap: () => _open(context, 'Search music'), decoration: const InputDecoration(hintText: 'Search songs, albums and artists', prefixIcon: Icon(Icons.search, color: neroPink))),
+          TextField(
+            readOnly: true,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(builder: (_) => const SearchScreen()),
+            ),
+            decoration: const InputDecoration(
+              hintText: 'Search songs, albums and artists',
+              prefixIcon: Icon(Icons.search, color: neroPink),
+            ),
+          ),
           const SizedBox(height: 22),
           ClipRRect(
             borderRadius: BorderRadius.circular(22),
             child: SizedBox(
-              height: 205,
+              height: 390,
               width: double.infinity,
               child: Stack(
                 fit: StackFit.expand,
@@ -584,39 +616,63 @@ class _HomeTab extends StatelessWidget {
                   DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        begin: Alignment.bottomLeft,
-                        end: Alignment.topRight,
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
                         colors: [
-                          neroDark.withValues(alpha: 0.88),
-                          neroDark.withValues(alpha: 0.12),
+                          neroDark.withValues(alpha: 0.04),
+                          neroDark.withValues(alpha: 0.78),
                         ],
                       ),
                     ),
                   ),
-                  const Padding(
-                    padding: EdgeInsets.all(20),
-                    child: Align(
-                      alignment: Alignment.bottomLeft,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'FEEL THE MUSIC',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 22,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1,
-                            ),
+                  const Positioned(
+                    left: 18,
+                    right: 18,
+                    bottom: 86,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'FEEL THE MUSIC',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 23,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1,
                           ),
-                          SizedBox(height: 6),
-                          Text(
-                            'Discover new sounds. Support the artists you love.',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                        ],
-                      ),
+                        ),
+                        SizedBox(height: 6),
+                        Text(
+                          'Discover new sounds. Support the artists you love.',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Positioned(
+                    left: 12,
+                    right: 12,
+                    bottom: 18,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _BannerControl(
+                          icon: Icons.skip_previous_rounded,
+                          label: 'Previous',
+                          onPressed: () => _open(context, 'Previous featured mix'),
+                        ),
+                        _BannerControl(
+                          icon: Icons.play_arrow_rounded,
+                          label: 'Play',
+                          prominent: true,
+                          onPressed: () => _open(context, 'Featured music'),
+                        ),
+                        _BannerControl(
+                          icon: Icons.skip_next_rounded,
+                          label: 'Next',
+                          onPressed: () => _open(context, 'Next featured mix'),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -650,6 +706,142 @@ class _HomeTab extends StatelessWidget {
           Wrap(spacing: 8, children: ['Afrobeats', 'Gospel', 'Hip-Hop', 'R&B', 'Pop', 'Highlife'].map((g) => ActionChip(label: Text(g), onPressed: () => _open(context, g))).toList()),
           const SizedBox(height: 20),
           _MenuTile(icon: Icons.mic, title: 'Artist opportunities', subtitle: 'Apply to publish music and earn', onTap: () => _open(context, 'Artist application')),
+        ],
+      );
+}
+
+
+class SearchScreen extends StatefulWidget {
+  const SearchScreen({super.key});
+
+  @override
+  State<SearchScreen> createState() => _SearchScreenState();
+}
+
+class _SearchScreenState extends State<SearchScreen> {
+  final TextEditingController _query = TextEditingController();
+  static const _discoverable = <String>[
+    'Afrobeats',
+    'Gospel',
+    'Hip-Hop',
+    'R&B',
+    'Pop',
+    'Highlife',
+    'Trending music',
+    'New releases',
+    'Top artists',
+    'Playlists',
+  ];
+
+  @override
+  void dispose() {
+    _query.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final query = _query.text.trim().toLowerCase();
+    final results = _discoverable
+        .where((item) => item.toLowerCase().contains(query))
+        .toList();
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Search music')),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          TextField(
+            controller: _query,
+            autofocus: true,
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              hintText: 'Search genres and music collections',
+              prefixIcon: const Icon(Icons.search, color: neroPink),
+              suffixIcon: _query.text.isEmpty
+                  ? null
+                  : IconButton(
+                      onPressed: () {
+                        _query.clear();
+                        setState(() {});
+                      },
+                      icon: const Icon(Icons.close),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            query.isEmpty ? 'Explore music' : 'Search results',
+            style: const TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 10),
+          if (results.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 28),
+              child: Text(
+                'No matching genres or collections. A live song and artist '
+                'catalogue will appear here once a music provider is connected.',
+                textAlign: TextAlign.center,
+              ),
+            )
+          else
+            for (final item in results)
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.graphic_eq, color: neroPink),
+                  title: Text(item),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _open(context, item),
+                ),
+              ),
+          const SizedBox(height: 14),
+          const Text(
+            'Song and artist search requires a connected music catalogue.',
+            style: TextStyle(color: neroPink),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BannerControl extends StatelessWidget {
+  const _BannerControl({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    this.prominent = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+  final bool prominent;
+
+  @override
+  Widget build(BuildContext context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Material(
+            color: prominent ? neroRed : Colors.black.withValues(alpha: 0.48),
+            shape: const CircleBorder(),
+            child: IconButton(
+              onPressed: onPressed,
+              color: Colors.white,
+              iconSize: prominent ? 34 : 27,
+              icon: Icon(icon),
+              tooltip: label,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       );
 }
@@ -771,7 +963,7 @@ class _MusicCard extends StatelessWidget {
   final IconData icon;
   @override
   Widget build(BuildContext context) => InkWell(onTap: () => _open(context, title), child: Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    Container(height: 85, decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), gradient: const LinearGradient(colors: [neroRed, neroPink])), child: Icon(icon, color: Colors.white, size: 40)),
+    Container(height: 85, decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), gradient: const LinearGradient(colors: [neroRed, neroPink])), child: Icon(icon, color: Colors.white, size: 25)),
     const SizedBox(height: 10), Text(title, style: const TextStyle(fontWeight: FontWeight.bold)), Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
   ]))));
 }
@@ -786,7 +978,7 @@ class DetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text(title)), body: Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
     const Icon(Icons.graphic_eq, color: neroPink, size: 52), const SizedBox(height: 14), Text(title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-    const SizedBox(height: 8), const Text('This section will be activated as its Stage 2 feature is connected.'),
+    const SizedBox(height: 8), const Text('This section is ready for its service connection. Live music playback, worldwide song search, artist catalogues, royalties and payments require their respective provider integrations.'),
   ]))));
 }
 
