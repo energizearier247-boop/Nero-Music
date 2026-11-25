@@ -1,0 +1,26 @@
+NERO MUSIC - CORRECTED SOURCE HANDOFF
+
+This package was rebuilt from the user's uploaded Nero-Music-main (3).zip.
+
+Corrections in lib/main.dart:
+1. Added a single app-wide GlobalKey<ScaffoldMessengerState>.
+2. Registered it on the root MaterialApp.
+3. Replaced BuildContext-based snackbar calls in AuthScreen and
+   PasswordUpdateScreen with the global messenger key.
+4. Reworked _forgotPassword so it never reads BuildContext after an await,
+   and it reports AuthException and unexpected failures through the key.
+
+The navigation destination source line reported as truncated by the user's
+GitHub Actions log is intact in this package:
+NavigationDestination(icon: Icon(Icons.library_music_outlined),
+  selectedIcon: Icon(Icons.library_music), label: 'Library'),
+
+Important:
+- The GitHub Actions error log reports the repository's lib/main.dart was
+  syntactically truncated at that line. The uploaded ZIP's original source
+  did not contain that truncation; its complete line is preserved here.
+- This environment has no Flutter/Dart SDK. `dart format`, `flutter analyze`,
+  `flutter test`, and `flutter build apk --release` were not run here.
+- The included GitHub Actions workflow runs those commands. Replace the
+  repository's complete lib/main.dart with this package's lib/main.dart,
+  rather than editing only the broken line or pasting a partial snippet.

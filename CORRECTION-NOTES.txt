@@ -1,0 +1,23 @@
+NERO MUSIC - SOURCE CORRECTION NOTES
+
+Applied:
+- Added a root-level GlobalKey<ScaffoldMessengerState>.
+- Registered it on MaterialApp.scaffoldMessengerKey.
+- Changed password-reset success, authentication-error, and fallback notifications
+  to use the global messenger key rather than a ScaffoldMessenger obtained from
+  BuildContext.
+- Changed the shared AuthScreen and PasswordUpdateScreen notification helpers
+  to use the same root messenger key.
+
+Preserved:
+- Existing Supabase project URL and publishable key configuration.
+- Existing auth redirect URI.
+- Existing screens, five navigation tabs, themes, assets, and build workflow.
+
+Validation limitation:
+- This environment does not have the Flutter or Dart SDK installed and cannot
+  reach the Flutter SDK download host. Therefore dart format, flutter analyze,
+  flutter test, and APK build could not be executed here.
+- The GitHub Actions workflow in .github/workflows/build-android.yml already
+  runs dependency resolution, dart format, flutter analyze, flutter test, and
+  the release APK build. Push this project to GitHub to execute those checks.
